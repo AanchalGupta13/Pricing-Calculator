@@ -11,21 +11,21 @@
     <header>
         <h1>💰 Pricing Calculator</h1>
     </header>
-    <img src="logo.png" alt="Logo" class="logo">
+    <img src="BellBlazeTech-Logo.png" alt="Logo" class="logo">
     <div class="container">
         <!-- File Upload & Download Section -->
         <div class="column file-section">
             <h2 class="m1">📂 Upload & Download Files</h2>
             <div class="upload-section">
                 <input type="file" id="fileInput">
-                <button onclick="uploadFile()">📤 Upload</button>
+                <button onclick="uploadFile()"><img src="upload.png" class="button-icon">Upload</button>
                 <div id="uploadStatus"></div>
             </div>
 
             <div class="file-list-section">
                 <h2>📜 Available Files</h2>
                 <select id="fileDropdown"></select>
-                <button onclick="downloadSelectedFile()">📥 Download</button>
+                <button onclick="downloadSelectedFile()"><img src="download.png" class="button-icon">Download</button>
             </div>
         </div>
 
@@ -37,7 +37,7 @@
             </div>
             <div class="chat-input">
                 <input type="text" id="userInput" placeholder="Describe your server configuration..." />
-                <button onclick="sendMessage()">▶ Send</button>
+                <button onclick="sendMessage()"><img src="send.png" class="icon">Send</button>
             </div>
         </div>
     </div>
