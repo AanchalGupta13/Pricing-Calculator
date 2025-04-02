@@ -1,0 +1,1 @@
+A pricing calculator that allows users to upload server and database configurations file, process the data, and download a CSV file containing the estimated costs. Additionally, users can interact with a chatbot to query specific server and database configurations, and the chatbot will dynamically retrieve and display the estimated cost based on the provided inputs.
