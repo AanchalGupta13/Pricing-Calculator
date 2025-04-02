@@ -1,6 +1,6 @@
 AWS.config.region = "us-east-1"; // Change to your AWS region
 AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-    IdentityPoolId: "us-east-1:64e5884b-28df-4bbe-ae4e-097bb5132272" // Replace with your Cognito Identity Pool ID
+    IdentityPoolId: "us-east-1:64e5884b-28df-4bbe-ae4e-097bb5132272" 
 });
 
 const s3 = new AWS.S3();
