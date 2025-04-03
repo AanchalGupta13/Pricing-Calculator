@@ -68,6 +68,15 @@ h1 {
     margin-bottom: 30px;
 }
 
+.status-message {
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #2e80bb;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
 .file-list-section {
     position: relative;
     background: #e5f5fa;
@@ -119,8 +128,9 @@ button:hover {
     height: 300px;
     border-radius: 10px;
     padding: 10px;
-    overflow-y: auto;
+    overflow-y: auto;  /* Enables scrolling */
     background: #eef7fa;
+    max-height: 400px; /* Prevents overflowing */
 }
 
 .chat-input {
