@@ -57,4 +57,15 @@ async function sendMessage() {
     }
 
     document.getElementById("userInput").value = "";
+<<<<<<< HEAD
 }
+=======
+    scrollToBottom();  // ⬅️ Auto-scroll after chatbot response
+}
+
+// This Function is for Scroll Automatically** ⬇️
+function scrollToBottom() {
+    let chatbox = document.getElementById("chatbox");
+    chatbox.scrollTop = chatbox.scrollHeight;
+}
+>>>>>>> 8335f82 (updated commit)

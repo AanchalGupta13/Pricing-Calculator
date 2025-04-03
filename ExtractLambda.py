@@ -154,4 +154,8 @@ def lambda_handler(event, context):
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
+<<<<<<< HEAD
         return {"statusCode": 500, "body": json.dumps(f"Unexpected error: {e}")}
+=======
+        return {"statusCode": 500, "body": json.dumps(f"Unexpected error: {e}")}
+>>>>>>> 8335f82 (updated commit)

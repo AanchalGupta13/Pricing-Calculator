@@ -15,6 +15,10 @@ pricing_client = boto3.client("pricing", region_name="us-east-1")
 def fetch_ec2_instance_types():
     try:
         response = ec2_client.describe_instance_types()
+<<<<<<< HEAD
+=======
+        # logger.info(f"EC2 instance types response: {json.dumps(response)}")
+>>>>>>> 8335f82 (updated commit)
         instance_data = {
             instance['InstanceType']: {
                 "vCPUs": instance['VCpuInfo']['DefaultVCpus'],
@@ -27,6 +31,28 @@ def fetch_ec2_instance_types():
     except Exception as e:
         logger.error(f"Error fetching EC2 instance types: {e}")
         return {}
+<<<<<<< HEAD
+=======
+      
+# # Extract CPU and RAM from requirements
+# def extract_cpu_ram(requirements):
+#     logger.info(f"Extracting CPU and RAM from requirements: {requirements}")
+#     filtered_requirements = []
+#     for req in requirements:
+#         cpu_match = re.search(r'(\d+)\s+Cores', req['CPU'])
+#         ram_match = re.search(r'(\d+)GB', req['RAM'])
+        
+#         if cpu_match and ram_match:
+#             filtered_requirements.append({
+#                 'Server Name': req['Server Name'],
+#                 'Storage': req['Storage'],
+#                 'Database': req['Database'],
+#                 'CPU': int(cpu_match.group(1)),
+#                 'RAM': int(ram_match.group(1))
+#             })
+#     logger.info(f"Filtered requirements: {filtered_requirements}")
+#     return filtered_requirements  #returns a list with server name, ip, cpu and ram in  numeric only
+>>>>>>> 8335f82 (updated commit)
 
 # Find best matching instances
 def find_best_match(requirements, ec2_instances):
@@ -119,11 +145,35 @@ def calculate_database_cost(database, storage_str):
 def lambda_handler(event, context):
     logger.info("Received event: " + json.dumps(event))
     ec2_instances = fetch_ec2_instance_types()
+<<<<<<< HEAD
+=======
+    # logger.info("Fetched EC2 instances: " + json.dumps(ec2_instances))
+    # logger.info("Received event: " + json.dumps(event))
+>>>>>>> 8335f82 (updated commit)
     try:
         requirements = event.get("requirements", [])
         logger.info("Extracted requirements: " + json.dumps(requirements))
 
+<<<<<<< HEAD
         matched_instances = find_best_match(requirements, ec2_instances)
+=======
+        # filtered_requirements = []
+        # for req in requirements:
+        #     cpu_match = re.search(r'(\d+)\s+Cores',str( req['CPU']))
+        #     ram_match = re.search(r'(\d+)GB', str(req['RAM']))
+        #     if cpu_match and ram_match:
+        #         filtered_requirements.append({
+        #         'Server Name': req['Server Name'],
+        #         'Storage': req['Storage'],
+        #         'Database': req['Database'],
+        #         'CPU': int(cpu_match.group(1)),
+        #         'RAM': int(ram_match.group(1))
+        #     })
+        # logger.info(f"Filtered requirements: {filtered_requirements}")
+
+        matched_instances = find_best_match(requirements, ec2_instances)
+        # logger.info("Matched instances: " + json.dumps(matched_instances))
+>>>>>>> 8335f82 (updated commit)
         
         # Calculate pricing
         for instance in matched_instances:
@@ -137,4 +187,8 @@ def lambda_handler(event, context):
         return {"statusCode": 200, "body": json.dumps(matched_instances)}
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
+<<<<<<< HEAD
         return {"statusCode": 500, "body": json.dumps(f"Unexpected error: {e}")}
+=======
+        return {"statusCode": 500, "body": json.dumps(f"Unexpected error: {e}")}
+>>>>>>> 8335f82 (updated commit)
