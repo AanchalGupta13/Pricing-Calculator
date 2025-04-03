@@ -57,9 +57,6 @@ async function sendMessage() {
     }
 
     document.getElementById("userInput").value = "";
-<<<<<<< HEAD
-}
-=======
     scrollToBottom();  // ⬅️ Auto-scroll after chatbot response
 }
 
@@ -68,4 +65,3 @@ function scrollToBottom() {
     let chatbox = document.getElementById("chatbox");
     chatbox.scrollTop = chatbox.scrollHeight;
 }
->>>>>>> 8335f82 (updated commit)

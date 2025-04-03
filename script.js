@@ -85,8 +85,4 @@ function downloadSelectedFile() {
 }
 
 // Load files on page load
-<<<<<<< HEAD
 window.onload = listFiles;
-=======
-window.onload = listFiles;
->>>>>>> 8335f82 (updated commit)
