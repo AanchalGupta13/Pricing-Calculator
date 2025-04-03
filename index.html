@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1040.0.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>💰 Pricing Calculator</h1>
+    </header>
+    <img src="BellBlazeTech-Logo.png" alt="Logo" class="logo">
+    <div class="container">
+        <!-- File Upload & Download Section -->
+        <div class="column file-section">
+            <h2 class="m1">📂 Upload & Download Files</h2>
+            <div class="upload-section">
+                <input type="file" id="fileInput">
+                <button onclick="uploadFile()">
+                    <img src="upload.png" class="button-icon">Upload
+                </button>
+            </div>
+            <div id="uploadStatus" class="status-message"> </div>
+
+            <div class="file-list-section">
+                <h2>📜 Available Files</h2>
+                <select id="fileDropdown"></select>
+                <button onclick="downloadSelectedFile()"><img src="download.png" class="button-icon">Download</button>
+            </div>
+        </div>
+
+        <!-- Chatbot Section -->
+        <div class="column chat-container">
+            <h2>🤖 AI Chatbot</h2>
+            <div class="chatbox" id="chatbox">
+                <div id="messages"></div>
+            </div>
+            <div class="chat-input">
+                <input type="text" id="userInput" placeholder="Describe your server configuration..." />
+                <button onclick="sendMessage()"><img src="send.png" class="icon">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="chat.js"></script>
+
+</body>
+</html>

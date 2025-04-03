@@ -1,0 +1,156 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+}
+
+body {
+    background: linear-gradient(135deg, #E3E9FD, #CAD6FC);
+    font-family: 'Arial', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+header {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.logo {
+    padding: 10px;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 200px; /* Adjust size */
+    height: auto;
+    opacity: 0.8; /* Adjust transparency */
+}
+
+h1 {
+    padding-top: 30px;
+    padding-bottom: 30px;
+    font-size: 2.5em;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.container {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    width: 90%;
+    max-width: 1200px;
+}
+
+.column {
+    flex: 1;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    color: #333;
+}
+
+.upload-section{
+    display: flex;
+    justify-content: flex-end;
+    position: relative;
+    background: #e5f5fa;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    text-align: left;
+    padding-right: 25px;
+    margin-top: 12px;
+    margin-bottom: 30px;
+}
+
+.status-message {
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    color: #2e80bb;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.file-list-section {
+    position: relative;
+    background: #e5f5fa;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    text-align: left;
+    margin-top: 12px;
+    margin-bottom: 30px;
+}
+
+button {
+    /* display: flex; */
+    align-items: center; /* Align text and image in center */
+    justify-content: center; /* Center content */
+    margin-right: 20px;
+    background:#2e80bb;
+    color: white;
+    margin-left: 30px;
+    padding: 6px 10px;
+    padding-left: 10px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 0.3s;
+    font-size: 14px;
+}
+
+.button-icon {
+    /* padding-top: 6px; */
+    width: 20px; /* Adjust icon size */
+    height: auto;
+    margin-right: 5px; /* Space between icon and text */
+}
+
+.icon {
+    padding-top: 6px;
+    width: 15px; /* Adjust icon size */
+    height: auto;
+    margin-right: 8px; /* Space between icon and text */
+}
+
+button:hover {
+    background: #0056b3;
+    transform: scale(1.05);
+}
+
+.chatbox {
+    height: 300px;
+    border-radius: 10px;
+    padding: 10px;
+    overflow-y: auto;  /* Enables scrolling */
+    background: #eef7fa;
+    max-height: 400px; /* Prevents overflowing */
+}
+
+.chat-input {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.chat-input input {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: 2px solid #2e80bb;
+}
+
+.chat-input button {
+    padding: 10px 15px;
+}
+
+.m1{
+padding-top: 10px;
+padding-bottom: 10px;
+}
