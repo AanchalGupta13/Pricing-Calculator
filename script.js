@@ -10,7 +10,8 @@ let processingStarted = false; // Flag to track if processing has started
 
 // Upload File to S3
 function uploadFile() {
-    let file = document.getElementById("fileInput").files[0];
+    let fileInput = document.getElementById("fileInput");
+    let file = fileInput.files[0];
     if (!file) {
         alert("Please select a file first!");
         return;
@@ -36,6 +37,9 @@ function uploadFile() {
                 document.getElementById("uploadStatus").innerText = "Processing...";
                 listFiles(); // Refresh file list after processing starts
             }, 3000);
+
+            // **Clear file input after upload**
+            fileInput.value = ""; 
         }
     });
 }
@@ -123,6 +127,9 @@ function downloadSelectedFile() {
             setTimeout(() => {
                 fileDropdown.value = ""; // Reset dropdown
             }, 1000);
+
+            // **Clear the file input field**
+            document.getElementById("fileInput").value = "";
         }
     });
 }
