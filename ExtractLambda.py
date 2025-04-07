@@ -25,11 +25,6 @@ timestamp_str = current_time_ist.strftime("%H:%M:%S_%d-%m-%Y")
 
 # Environment variables
 BUCKET_NAME = os.environ.get("S3_BUCKET_NAME", "price-inventory")
-FILE_KEY = os.environ.get('S3_FILE_KEY', 'physical_servers_inventory1.xlsx')
-# Create a filename with IST timestamp
-CSV_FILE_KEY = f"matched_ec2_db_instances_{timestamp_str}.csv"
-# CSV_FILE_KEY = "matched_ec2_db_instances.csv"
-logger.info(f"CSV_FILE_KEY: {CSV_FILE_KEY}")
 CALCULATE_LAMBDA_NAME = os.environ.get("CALCULATE_LAMBDA_NAME", "CostCalculationLambda")
 
 # Fetch and read the Excel file from S3
@@ -46,9 +41,6 @@ def fetch_requirements_from_s3(bucket, file_key):
     except Exception as e:
         logger.error(f"Error fetching file from S3: {e}")
         return []
-      
-# Extract CPU and RAM from requirements
-import re
 
 # Extract CPU and RAM from requirements
 def extract_cpu_ram(requirements):
@@ -83,7 +75,7 @@ def extract_cpu_ram(requirements):
     return filtered_requirements  # Returns a list of cleaned CPU and RAM values
 
 # Store results in S3 as CSV
-def store_results_in_s3_csv(data, bucket=BUCKET_NAME, key=CSV_FILE_KEY):
+def store_results_in_s3_csv(data, bucket, key):
     try:
         # Ensure data is a list of dictionaries
         if not isinstance(data, list) or not all(isinstance(i, dict) for i in data):
@@ -116,6 +108,11 @@ def lambda_handler(event, context):
     try:
         bucket = event["Records"][0]["s3"]["bucket"]["name"]
         file_key = event["Records"][0]["s3"]["object"]["key"]
+
+        # Extract base name of uploaded file (without extension)
+        original_filename = os.path.splitext(os.path.basename(file_key))[0]
+        # Create a filename with IST timestamp
+        CSV_FILE_KEY = f"result_{original_filename}_{timestamp_str}.csv"
         
         requirements = fetch_requirements_from_s3(bucket, file_key)
         if not requirements:
@@ -145,9 +142,7 @@ def lambda_handler(event, context):
             logger.error(f"Invalid processed data format received: {processed_data}")
             return {"statusCode": 500, "body": json.dumps("Invalid processed data format.")}
 
-        logger.info(f"Processed Data (Validated): {processed_data}")
-
-        if store_results_in_s3_csv(processed_data):
+        if store_results_in_s3_csv(processed_data, bucket=BUCKET_NAME, key=CSV_FILE_KEY):
             return {"statusCode": 200, "body": json.dumps(f"CSV stored at s3://{BUCKET_NAME}/{CSV_FILE_KEY}")}
 
         return {"statusCode": 500, "body": json.dumps("Failed to store results in S3.")}

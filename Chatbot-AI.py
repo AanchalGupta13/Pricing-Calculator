@@ -26,6 +26,7 @@ def extract_configuration(query):
                 "topP": 1
             }
         }
+        logger.info(f"Request body: {request_body}")
 
         response = bedrock_runtime.invoke_model(
             modelId='amazon.titan-text-express-v1',
@@ -35,14 +36,12 @@ def extract_configuration(query):
         )
 
         raw_response = response['body'].read().decode('utf-8')
-        logger.info(f"Bedrock Raw Response: {raw_response}")
 
         if not raw_response.strip():
             logger.error("Bedrock response is empty!")
             return {"error": "Bedrock returned an empty response"}
 
         response_data = json.loads(raw_response)
-        logger.info(f"Bedrock Response Data: {response_data}")
 
         # Ensure "results" exists and is not empty
         if "results" not in response_data or not response_data["results"]:
@@ -51,25 +50,18 @@ def extract_configuration(query):
         
         # if "results" in response_data and response_data["results"]:
         output_text = response_data["results"][0].get("outputText", "").strip()
-        logger.info(f"Bedrock Output Text: {output_text}")
 
         # Remove unwanted markdown-style JSON formatting
         output_text = output_text.replace("```tabular-data-json", "").replace("```", "").strip()
-        logger.info(f"Cleaned Bedrock Output Text: {output_text}")
         output_text = output_text.replace("rows", "requirements")
-        logger.info(f"Cleaned Bedrock Output Text: {output_text}")
-        # data = output_text
-        # output_text = {"requirements": data.pop("rows")}
 
         try:
             extracted_config = json.loads(output_text)
-            logger.info(f"Extracted Config: {extracted_config}")
 
             # Fix structure if Bedrock returns a list instead of dictionary
             if isinstance(extracted_config, list):
                 extracted_config = {"requirements": extracted_config}
-            logger.info(f"Fixed Extracted Config: {extracted_config}")
-            logger.info(type(extracted_config))
+
             # Ensure extracted_config has "requirements" key and it's a list
             if not isinstance(extracted_config, dict) or "requirements" not in extracted_config:
                 logger.error(f"Unexpected Bedrock response format: {extracted_config}")
@@ -80,10 +72,6 @@ def extract_configuration(query):
             if not isinstance(requirements, list):
                 logger.error(f"Expected 'requirements' to be a list, but got: {type(requirements)}")
                 return {"error": "Invalid response structure"}
-
-            logger.info(f"Valid Requirements List: {requirements}")
-
-            # return extracted_config
 
             # Extract CPU and RAM from requirements
             filtered_requirements = []
@@ -105,20 +93,9 @@ def extract_configuration(query):
             logger.info(f"Filtered Requirements: {filtered_requirements}")
             return filtered_requirements
 
-                # # Convert list of key-value pairs to dictionary if required
-                # if "rows" in extracted_config and isinstance(extracted_config["rows"], list):
-                #     extracted_config = {row["System"]: row["Value"] for row in extracted_config["rows"] if "System" in row and "Value" in row}
-
-                # logger.info(f"Extracted Config: {extracted_config}")
-                # return {extracted_config} if isinstance(extracted_config, list) else extracted_config
-
         except json.JSONDecodeError as e:
             logger.error(f"JSON Parsing Error: {str(e)} - Raw response: {output_text}")
             return {"error": "Invalid JSON response from Bedrock"}
-
-        # else:
-        #     logger.error(f"Unexpected response format from Bedrock: {response_data}")
-        #     return {"error": "Invalid response from Bedrock"}
 
     except json.JSONDecodeError as e:
         logger.error(f"JSON Parsing Error: {str(e)} - Raw response: {raw_response}")
@@ -154,10 +131,6 @@ def invoke_cost_lambda(config_data):
     except Exception as e:
         logger.error(f"Error invoking cost estimation Lambda: {str(e)}")
         return {"error": "Failed to invoke cost Lambda"}
-
-    # except Exception as e:
-    #     logger.error(f"Error invoking cost estimation Lambda: {str(e)}")
-    #     raise
 
 def lambda_handler(event, context):
     logger.info(f"Received event: {event}")

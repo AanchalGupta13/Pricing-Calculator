@@ -47,17 +47,17 @@ async function sendMessage() {
 
                 messagesDiv.innerHTML += formattedResponse;
             } else {
-                messagesDiv.innerHTML += `<div class="ai-message"><b>AI:</b> Error processing cost estimate.</div>`;
+                messagesDiv.innerHTML += `<div class="ai-message">🤖 <b>AI:</b> Error processing cost estimate.</div>`;
             }
         } else {
-            messagesDiv.innerHTML += `<div class="ai-message"><b>AI:</b> Invalid response from server.</div>`;
+            messagesDiv.innerHTML += `<div class="ai-message">🤖 <b>AI:</b> Invalid response from server.</div>`;
         }
     } catch (error) {
-        messagesDiv.innerHTML += `<div class="ai-message"><b>AI:</b> Request failed.</div>`;
+        messagesDiv.innerHTML += `<div class="ai-message">🤖 <b>AI:</b> Request failed.</div>`;
     }
 
     document.getElementById("userInput").value = "";
-    scrollToBottom();  // ⬅️ Auto-scroll after chatbot response
+    scrollToBottom();  // Auto-scroll after chatbot response
 }
 
 // This Function is for Scroll Automatically** ⬇️

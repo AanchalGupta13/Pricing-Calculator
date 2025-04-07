@@ -68,6 +68,13 @@ h1 {
     margin-bottom: 30px;
 }
 
+#fileInput{
+    position: relative;
+    width: 300px;
+    margin-left: 20px;
+    margin-right: 20px;
+}
+
 .status-message {
     text-align: center;
     font-size: 14px;
@@ -86,6 +93,14 @@ h1 {
     text-align: left;
     margin-top: 12px;
     margin-bottom: 30px;
+    padding-right: 25px;
+}
+
+#fileDropdown{
+    position: relative;
+    width: 300px;
+    margin-left: 20px;
+    margin-right: 20px;
 }
 
 button {

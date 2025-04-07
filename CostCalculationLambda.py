@@ -15,39 +15,18 @@ pricing_client = boto3.client("pricing", region_name="us-east-1")
 def fetch_ec2_instance_types():
     try:
         response = ec2_client.describe_instance_types()
-        # logger.info(f"EC2 instance types response: {json.dumps(response)}")
         instance_data = {
             instance['InstanceType']: {
                 "vCPUs": instance['VCpuInfo']['DefaultVCpus'],
                 "MemoryMiB": instance['MemoryInfo']['SizeInMiB'] // 1024  # Convert MB to GB
             }
             for instance in response['InstanceTypes']
-        }
-        # logger.info(f"Processed EC2 instance data: {json.dumps(instance_data)}")        
+        }      
         return instance_data
     except Exception as e:
         logger.error(f"Error fetching EC2 instance types: {e}")
         return {}
       
-# # Extract CPU and RAM from requirements
-# def extract_cpu_ram(requirements):
-#     logger.info(f"Extracting CPU and RAM from requirements: {requirements}")
-#     filtered_requirements = []
-#     for req in requirements:
-#         cpu_match = re.search(r'(\d+)\s+Cores', req['CPU'])
-#         ram_match = re.search(r'(\d+)GB', req['RAM'])
-        
-#         if cpu_match and ram_match:
-#             filtered_requirements.append({
-#                 'Server Name': req['Server Name'],
-#                 'Storage': req['Storage'],
-#                 'Database': req['Database'],
-#                 'CPU': int(cpu_match.group(1)),
-#                 'RAM': int(ram_match.group(1))
-#             })
-#     logger.info(f"Filtered requirements: {filtered_requirements}")
-#     return filtered_requirements  #returns a list with server name, ip, cpu and ram in  numeric only
-
 # Find best matching instances
 def find_best_match(requirements, ec2_instances):
     if not requirements or not ec2_instances:
@@ -75,7 +54,6 @@ def find_best_match(requirements, ec2_instances):
                 "Storage": req["Storage"],
                 "Database": req["Database"]
             })
-    # logger.info(f"Matched instances: {json.dumps(matched_instances)}")
     return matched_instances
 
 # Get instance pricing
@@ -97,7 +75,6 @@ def get_instance_price(instance_type, region="US East (N. Virginia)"):
             return None
         price_json = json.loads(price_data[0])
         price_per_hour = float(price_json['terms']['OnDemand'].values().__iter__().__next__()['priceDimensions'].values().__iter__().__next__()['pricePerUnit']['USD'])
-        # logger.info(f"Price for {instance_type}: {price_per_hour}")
         return price_per_hour
     except Exception as e:
         logger.error(f"Error fetching price for {instance_type}: {e}")
@@ -139,28 +116,11 @@ def calculate_database_cost(database, storage_str):
 def lambda_handler(event, context):
     logger.info("Received event: " + json.dumps(event))
     ec2_instances = fetch_ec2_instance_types()
-    # logger.info("Fetched EC2 instances: " + json.dumps(ec2_instances))
-    # logger.info("Received event: " + json.dumps(event))
     try:
         requirements = event.get("requirements", [])
         logger.info("Extracted requirements: " + json.dumps(requirements))
 
-        # filtered_requirements = []
-        # for req in requirements:
-        #     cpu_match = re.search(r'(\d+)\s+Cores',str( req['CPU']))
-        #     ram_match = re.search(r'(\d+)GB', str(req['RAM']))
-        #     if cpu_match and ram_match:
-        #         filtered_requirements.append({
-        #         'Server Name': req['Server Name'],
-        #         'Storage': req['Storage'],
-        #         'Database': req['Database'],
-        #         'CPU': int(cpu_match.group(1)),
-        #         'RAM': int(ram_match.group(1))
-        #     })
-        # logger.info(f"Filtered requirements: {filtered_requirements}")
-
         matched_instances = find_best_match(requirements, ec2_instances)
-        # logger.info("Matched instances: " + json.dumps(matched_instances))
         
         # Calculate pricing
         for instance in matched_instances:
