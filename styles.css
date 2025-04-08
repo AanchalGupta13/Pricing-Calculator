@@ -54,6 +54,12 @@ h1 {
     color: #333;
 }
 
+p{
+    margin-top: 3px;
+    margin-left: 8px;
+    font-size: 11px;
+}
+
 .upload-section{
     display: flex;
     justify-content: flex-end;
@@ -71,8 +77,8 @@ h1 {
 #fileInput{
     position: relative;
     width: 300px;
-    margin-left: 20px;
-    margin-right: 20px;
+    margin-left: 8px;
+    margin-right: 45px;
 }
 
 .status-message {
@@ -104,7 +110,6 @@ h1 {
 }
 
 button {
-    /* display: flex; */
     align-items: center; /* Align text and image in center */
     justify-content: center; /* Center content */
     margin-right: 20px;
@@ -121,7 +126,6 @@ button {
 }
 
 .button-icon {
-    /* padding-top: 6px; */
     width: 20px; /* Adjust icon size */
     height: auto;
     margin-right: 5px; /* Space between icon and text */

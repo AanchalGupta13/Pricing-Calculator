@@ -8,6 +8,7 @@ const BUCKET_NAME = "price-inventory";
 let previousFileList = []; // Store previous file list to track changes
 let processingStarted = false; // Flag to track if processing has started
 let uploadedFilename = ""; // Used to track original upload
+let uploadTime = null; // Track exact upload timestamp
 
 // Upload File to S3
 function uploadFile() {
@@ -18,7 +19,7 @@ function uploadFile() {
         return;
     }
     uploadedFilename = file.name; // ✅ Moved after null check
-
+    uploadTime = new Date(); // ✅ Capture upload time
 
     // Check file type (only allow Excel files)
     const allowedExtensions = ['.xls', '.xlsx', '.xlsm', 'csv'];
@@ -56,9 +57,6 @@ function uploadFile() {
                 document.getElementById("uploadStatus").innerText = "Processing...";
                 listFiles(); // Refresh file list after processing starts
             }, 1000);
-
-            // **Clear file input after upload**
-            fileInput.value = ""; 
         }
     });
 }
@@ -96,7 +94,10 @@ function listFiles() {
 
         // Step 2: Get latest result file for this upload
         const resultFilesForThisUpload = allFiles
-            .filter(f => f.key.startsWith(`Price_${originalNameWithoutExt}_`))
+            .filter(f =>
+                f.key.startsWith(`Price_${originalNameWithoutExt}_`) &&
+                (!uploadTime || f.lastModified >= uploadTime)
+            )
             .sort((a, b) => b.lastModified - a.lastModified);
 
         const latestResultFile = resultFilesForThisUpload[0];
@@ -113,6 +114,8 @@ function listFiles() {
         if (latestResultFile) {
             relatedFiles.push(latestResultFile.key);
         }
+        // Remove any accidental duplicates
+        relatedFiles = [...new Set(relatedFiles)];
 
         const newFiles = relatedFiles.filter(file => !previousFileList.includes(file));
         const hasNewFile = newFiles.length > 0;
@@ -135,13 +138,17 @@ function listFiles() {
 
         fileDropdown.value = relatedFiles.includes(currentValue) ? currentValue : "";
 
-        if (processingStarted && hasNewFile) {
-            document.getElementById("uploadStatus").innerText = "Processing Complete!";
-            setTimeout(() => {
-                document.getElementById("uploadStatus").innerText = "Now you can download your file from the dropdown";
-                processingStarted = false;
-            }, 2000);
-        }
+        if (processingStarted) {
+            if (latestResultFile) {
+                document.getElementById("uploadStatus").innerText = "Processing Complete!";
+                setTimeout(() => {
+                    document.getElementById("uploadStatus").innerText = "Now you can download your file from the dropdown";
+                    processingStarted = false;
+                }, 2000);
+            } else {
+                document.getElementById("uploadStatus").innerText = "Processing..."; // Keep showing this until result arrives
+            }
+        }        
 
         previousFileList = relatedFiles;
     });
@@ -182,6 +189,8 @@ function downloadSelectedFile() {
 
             // ✅ Clear file input field
             document.getElementById("fileInput").value = "";
+            uploadedFilename = "";
+            uploadTime = null;
         }
     });
 }
@@ -192,6 +201,7 @@ document.getElementById("fileDropdown").addEventListener("change", function () {
 });
 
 window.onload = function () {
+    uploadedFilename = ""; // Clear on first load
     listFiles();
     
     // Auto-refresh file list every 5 seconds

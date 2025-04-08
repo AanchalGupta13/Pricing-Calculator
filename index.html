@@ -17,10 +17,15 @@
         <div class="column file-section">
             <h2 class="m1">📂 Upload & Download Files</h2>
             <div class="upload-section">
+                <div classc="col">
                 <input type="file" id="fileInput" accept=".xls,.xlsx,.xlsm,csv">
+                <p>Please upload <strong>Excel</strong> files only (Max size: <strong>5 MB</strong>)</p>
+                </div>
+                <div class = "col">
                 <button onclick="uploadFile()">
                     <img src="upload.png" class="button-icon">Upload
                 </button>
+                </div>
             </div>
             <div id="uploadStatus" class="status-message"> </div>
 
