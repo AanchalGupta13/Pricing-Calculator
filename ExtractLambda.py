@@ -112,7 +112,7 @@ def lambda_handler(event, context):
         # Extract base name of uploaded file (without extension)
         original_filename = os.path.splitext(os.path.basename(file_key))[0]
         # Create a filename with IST timestamp
-        CSV_FILE_KEY = f"result_{original_filename}_{timestamp_str}.csv"
+        CSV_FILE_KEY = f"Price_{original_filename}_{timestamp_str}.csv"
         
         requirements = fetch_requirements_from_s3(bucket, file_key)
         if not requirements:

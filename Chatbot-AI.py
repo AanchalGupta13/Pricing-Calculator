@@ -17,11 +17,24 @@ def extract_configuration(query):
 
         request_body = {
             "inputText": f"""
-                Extract Server, CPU, RAM, Storage, and Database details from this requirement: '{query}'. 
-                Provide only a valid JSON object without markdown, explanations, or formatting tags.
-            """,
+            You are a strict JSON generator.
+            Based on the user requirement below, extract only the server configuration in valid, structured JSON format. No extra text, no markdown, no explanation.
+            Expected format:
+            {{
+                "requirements": [
+                    {{
+                        "Server Name": "...",
+                        "CPU": "...",
+                        "RAM": "...",
+                        "Storage": "...",
+                        "Database": "..."
+                    }}
+                ]
+            }}
+            User Input: "{query}"
+            Respond ONLY with valid JSON wrapped in a dictionary with a key "requirements".""",
             "textGenerationConfig": {
-                "maxTokenCount": 100,  # Increased to avoid truncation
+                "maxTokenCount": 500,  # Increased to avoid truncation
                 "temperature": 0.2,  # Reduce randomness
                 "topP": 1
             }
@@ -41,45 +54,36 @@ def extract_configuration(query):
             logger.error("Bedrock response is empty!")
             return {"error": "Bedrock returned an empty response"}
 
-        response_data = json.loads(raw_response)
-
-        # Ensure "results" exists and is not empty
-        if "results" not in response_data or not response_data["results"]:
-            logger.error(f"Unexpected Bedrock response format: {response_data}")
-            return {"error": "Invalid response from Bedrock"}
-        
-        # if "results" in response_data and response_data["results"]:
-        output_text = response_data["results"][0].get("outputText", "").strip()
-
-        # Remove unwanted markdown-style JSON formatting
-        output_text = output_text.replace("```tabular-data-json", "").replace("```", "").strip()
-        output_text = output_text.replace("rows", "requirements")
-
         try:
+            # Try loading Bedrock response
+            extracted_json = json.loads(raw_response)
+            # If it's already the expected structure from Bedrock
+            if isinstance(extracted_json, dict) and "results" in extracted_json:
+                output_text = extracted_json["results"][0].get("outputText", "").strip()
+            else:
+                # If Bedrock directly returned an array or object
+                output_text = raw_response.strip()
+
+            # Clean up unwanted markdown formatting
+            output_text = output_text.replace("```json", "").replace("```", "").strip()
+            output_text = output_text.replace("```tabular-data-json", "").replace("```", "").strip()
+
+            # Attempt to parse final cleaned JSON output
             extracted_config = json.loads(output_text)
 
-            # Fix structure if Bedrock returns a list instead of dictionary
+            # Wrap if it’s a list
             if isinstance(extracted_config, list):
                 extracted_config = {"requirements": extracted_config}
 
-            # Ensure extracted_config has "requirements" key and it's a list
-            if not isinstance(extracted_config, dict) or "requirements" not in extracted_config:
-                logger.error(f"Unexpected Bedrock response format: {extracted_config}")
-                return {"error": "Invalid response format from Bedrock"}
-                
-            requirements = extracted_config["requirements"]
+            if "requirements" not in extracted_config or not isinstance(extracted_config["requirements"], list):
+                logger.error(f"Unexpected format from Bedrock: {extracted_config}")
+                return {"error": "Invalid format in Bedrock response"}
 
-            if not isinstance(requirements, list):
-                logger.error(f"Expected 'requirements' to be a list, but got: {type(requirements)}")
-                return {"error": "Invalid response structure"}
-
-            # Extract CPU and RAM from requirements
             filtered_requirements = []
-            for req in requirements:
+            for req in extracted_config["requirements"]:
                 if isinstance(req, dict):
                     cpu_match = re.search(r'(\d+)\s*[cC]ores', req.get('CPU', ''))
                     ram_match = re.search(r'(\d+)\s*[gG][bB]', req.get('RAM', ''))
-                    logger.info(f"CPU Match: {cpu_match}, RAM Match: {ram_match}")
 
                     if cpu_match and ram_match:
                         filtered_req = {
@@ -90,16 +94,12 @@ def extract_configuration(query):
                             'Database': req.get('Database', 'Unknown')
                         }
                         filtered_requirements.append(filtered_req)
+
             logger.info(f"Filtered Requirements: {filtered_requirements}")
             return filtered_requirements
-
         except json.JSONDecodeError as e:
-            logger.error(f"JSON Parsing Error: {str(e)} - Raw response: {output_text}")
+            logger.error(f"JSON Parsing Error: {str(e)} - Raw response: {raw_response}")
             return {"error": "Invalid JSON response from Bedrock"}
-
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON Parsing Error: {str(e)} - Raw response: {raw_response}")
-        return {"error": "Invalid JSON response from Bedrock"}
 
     except Exception as e:
         logger.error(f"Error extracting configuration: {str(e)}")
@@ -160,11 +160,9 @@ def lambda_handler(event, context):
         # Get cost estimation
         cost_estimate = invoke_cost_lambda(config_data)
         logger.info(f"Cost Estimate: {cost_estimate}")
-        logger.info(type(cost_estimate))    
 
         response_body = json.dumps({"cost_estimate": cost_estimate})
         logger.info(f"Response Body: {response_body}")
-        logger.info(type(response_body))
 
         return {
             "statusCode": 200,
