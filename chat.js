@@ -1,12 +1,52 @@
+function updateQueryCounter() {
+    let queryCount = parseInt(localStorage.getItem("queryCount")) || 0;
+    document.getElementById("queryCountDisplay").textContent = queryCount;
+}
+
+// Call it when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    updateQueryCounter();
+});
+
 document.getElementById("userInput").addEventListener("keypress", function(event) {
     if (event.key === "Enter") {
         sendMessage();
+        clearInput(); // Clear input after sending
     }
 });
 
+// Add click event listener for the send button
+document.querySelector(".chat-input button").addEventListener("click", function() {
+    sendMessage();
+    clearInput(); // Clear input after sending
+});
+
+// Function to clear the input field
+function clearInput() {
+    document.getElementById("userInput").value = "";
+}
+
 async function sendMessage() {
+    // Check query count first
+    let queryCount = parseInt(localStorage.getItem("queryCount") || 0);
+    const maxFreeQueries = 6;
+    
+    if (queryCount >= maxFreeQueries) {
+        alert("⚠️ You've used all free queries. Please subscribe for unlimited access.");
+        return;
+    }
+    
     let userInput = document.getElementById("userInput").value.trim();
     if (!userInput) return;
+
+    // Increment query count
+    queryCount++;
+    localStorage.setItem("queryCount", queryCount.toString());
+    
+    // Display usage info
+    if (queryCount === maxFreeQueries) {
+        alert("⚠️ This is your last free query. Please subscribe for unlimited access.");
+    } 
 
     let messagesDiv = document.getElementById("messages");
 
@@ -68,12 +108,20 @@ async function sendMessage() {
         messagesDiv.innerHTML += `<div class="ai-message">🤖 <b>AI:</b> Request failed.</div>`;
     }
 
-    document.getElementById("userInput").value = "";
     scrollToBottom();  // Auto-scroll after chatbot response
+    updateQueryCounter();
 }
 
-// This Function is for Scroll Automatically** ⬇️
 function scrollToBottom() {
     let chatbox = document.getElementById("chatbox");
     chatbox.scrollTop = chatbox.scrollHeight;
+}
+
+function subscribeNow() {
+    if (confirm("Subscribe now for unlimited queries and file uploads?\n\n- Unlimited AI queries\n- Unlimited file uploads\n- Priority support")) {
+        localStorage.setItem("uploadCount", "0");
+        localStorage.setItem("queryCount", "0");
+        alert("✅ Thank you for subscribing! All limits have been reset.");
+        updateQueryCounter(); // Update the display
+    }
 }
