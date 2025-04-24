@@ -109,6 +109,7 @@ def invoke_cost_lambda(config_data):
     """Calls the existing Lambda function to estimate costs."""
     try:
         logger.info(f"Invoking cost Lambda with config: {config_data}")
+        
         # Wrap the list inside a dictionary with "requirements" key
         payload = {"requirements": config_data}
 

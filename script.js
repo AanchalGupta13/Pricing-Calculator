@@ -3,6 +3,17 @@ AWS.config.credentials = new AWS.CognitoIdentityCredentials({
     IdentityPoolId: "us-east-1:64e5884b-28df-4bbe-ae4e-097bb5132272"
 });
 
+// Initialize upload count if it doesn't exist
+if (!localStorage.getItem("uploadCount")) {
+    localStorage.setItem("uploadCount", "0");
+}
+
+// Function to update the display counters
+function updateUsageCounters() {
+    document.getElementById("uploadCountDisplay").textContent = localStorage.getItem("uploadCount") || "0";
+    document.getElementById("queryCountDisplay").textContent = localStorage.getItem("queryCount") || "0";
+}
+
 const s3 = new AWS.S3();
 const BUCKET_NAME = "price-inventory";
 let previousFileList = []; // Store previous file list to track changes
@@ -12,6 +23,13 @@ let uploadTime = null; // Track exact upload timestamp
 
 // Upload File to S3
 function uploadFile() {
+    // Check upload count first
+    let currentUploads = parseInt(localStorage.getItem("uploadCount")) || 0;
+    if (currentUploads >= 3) {
+        alert("⚠️ You've reached your free tier limit of 3 uploads.\nPlease subscribe for unlimited access.");
+        return;
+    }
+
     let fileInput = document.getElementById("fileInput");
     let file = fileInput.files[0];
     if (!file) {
@@ -29,11 +47,11 @@ function uploadFile() {
         return;
     }
 
-    // Check file size (limit to 5MB)
-    const MAX_SIZE_MB = 5;
+    // Check file size (limit to 1MB)
+    const MAX_SIZE_MB = 1;
     const maxSizeBytes = MAX_SIZE_MB * 1024 * 1024;
     if (file.size > maxSizeBytes) {
-        alert("File size exceeds 5 MB. Please upload a smaller file.");
+        alert("File size exceeds 1 MB. Please upload a smaller file.");
         return;
     }
 
@@ -50,6 +68,11 @@ function uploadFile() {
         if (err) {
             alert("Upload failed: " + err.message);
         } else {
+            // Increment upload count only on success
+            currentUploads = parseInt(localStorage.getItem("uploadCount")) || 0;
+            localStorage.setItem("uploadCount", (currentUploads + 1).toString());
+            updateUsageCounters();
+            
             document.getElementById("uploadStatus").innerText = "Upload Successful!";
             
             // Set "Processing..." after 1 seconds
@@ -201,9 +224,8 @@ document.getElementById("fileDropdown").addEventListener("change", function () {
 });
 
 window.onload = function () {
+    updateUsageCounters();
     uploadedFilename = ""; // Clear on first load
     listFiles();
-    
-    // Auto-refresh file list every 5 seconds
-    setInterval(listFiles, 5000);
+    setInterval(listFiles, 5000);  // Auto-refresh file list every 5 seconds
 };
