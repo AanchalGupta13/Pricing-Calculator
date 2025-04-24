@@ -5,6 +5,7 @@ Users can effortlessly upload configuration files through the interface, which a
 The platform also features an intelligent chatbot powered by Amazon Bedrock, allowing users to input server, storage, and database configuration requirements using natural language. The chatbot leverages generative AI models to extract relevant specifications from user queries and integrates with an AWS Lambda function to provide accurate, real-time AWS cost estimations.
 
 
+
 **🎯 Key Features** -
 
 ✅ Interactive chatbot interface for user queries
