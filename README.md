@@ -8,13 +8,8 @@ The platform also features an intelligent chatbot powered by Amazon Bedrock, all
 **🎯 Key Features** -
 
 ✅ Interactive chatbot interface for user queries
-
 ✅ Chatbot supports multi server queries
-
 ✅ Real-time pricing calculations using AWS Lambda
-
 ✅ Secure file storage on AWS S3
-
 ✅ API Gateway to manage backend communication
-
 ✅ AWS Bedrock for AI-powered responses
