@@ -8,22 +8,24 @@
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1040.0.min.js"></script>
 </head>
 <body>
-    <img src="BellBlazeTech-Logo.png" alt="Logo" class="logo">
     <header>
         <h1>💰 Pricing Calculator</h1>
     </header>
+    <img src="BellBlazeTech-Logo.png" alt="Logo" class="logo">
     <div class="container">
         <!-- File Upload & Download Section -->
         <div class="column file-section">
             <h2 class="m1">📂 Upload & Download Files</h2>
             <div class="upload-section">
-                <div class="col">
+                <div classc="col">
                 <input type="file" id="fileInput" accept=".xls,.xlsx,.xlsm,csv">
-                <p>Please upload <strong>Excel</strong> files only (Max size: <strong>1 MB</strong>)</p>
+                <p>Please upload <strong>Excel</strong> files only (Max size: <strong>5 MB</strong>)</p>
                 </div>
+                <div class = "col">
                 <button onclick="uploadFile()">
                     <img src="upload.png" class="button-icon">Upload
                 </button>
+                </div>
             </div>
             <div id="uploadStatus" class="status-message"> </div>
 
@@ -46,27 +48,9 @@
             </div>
         </div>
     </div>
-    <div class="usage-counter">
-        <strong>Free Tier Limits:</strong>
-        File Uploads: <span id="uploadCountDisplay">0</span>/3,
-        Queries used: <span id="queryCountDisplay">0</span>/6 
-    </div>
-    <button onclick="subscribeNow()" class="subscribe">
-        Subscribe
-    </button>
 
     <script src="script.js"></script>
     <script src="chat.js"></script>
-    <script>
-        function subscribeNow() {
-            if (confirm("Subscribe now to remove all limits and get unlimited uploads and queries?")) {
-                localStorage.setItem("uploadCount", "0");
-                localStorage.setItem("queryCount", "0");
-                updateUsageCounters(); // Call the function to immediately update the display
-                alert("✅ Thank you for subscribing! All limits have been reset.");
-            }
-        }
-    </script>
 
 </body>
 </html>
