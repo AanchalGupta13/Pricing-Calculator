@@ -11,11 +11,16 @@
             createSession();
         });
         function createSession(){
-            const queryString = window.location.search
-            const urlParams = new URLSearchParams(queryString);
+            const urlParams = new URLSearchParams(window.location.search);
             const token = urlParams.get('token');
-            localStorage.setItem("token", token)
-            window.location.href = `main.html`;
+            if (token && token.trim() !== "") {
+                // Token exists – store and redirect
+                localStorage.setItem("token", token);
+                window.location.href = "main.html";
+            } else {
+                // No token – stay on page or show message
+                document.body.innerHTML = "<h3>Access denied.</h3>";
+            }
         }  
     </script>
 </body>

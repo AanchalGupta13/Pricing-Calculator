@@ -10,9 +10,18 @@ if (!localStorage.getItem("uploadCount")) {
 
 // Function to update the display counters
 function updateUsageCounters() {
-    document.getElementById("uploadCountDisplay").textContent = localStorage.getItem("uploadCount") || "0";
-    document.getElementById("queryCountDisplay").textContent = localStorage.getItem("queryCount") || "0";
+    const isSubscribed = localStorage.getItem("subscribed") === "true";
+    const uploadCount = localStorage.getItem("uploadCount") || "0";
+    const maxUploads = isSubscribed ? 5 : 3;
+
+    // show the higher limits
+    document.getElementById("uploadCountDisplay").textContent = uploadCount;
 }
+
+// Call it when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    updateUsageCounters();
+});
 
 const s3 = new AWS.S3();
 const BUCKET_NAME = "price-inventory";
@@ -23,10 +32,15 @@ let uploadTime = null; // Track exact upload timestamp
 
 // Upload File to S3
 function uploadFile() {
-    // Check upload count first
+    const isSubscribed = localStorage.getItem("subscribed") === "true";
+    const maxUploads = isSubscribed ? 5 : 3; // Different limits based on subscription
+
+    // Get current upload count
     let currentUploads = parseInt(localStorage.getItem("uploadCount")) || 0;
-    if (currentUploads >= 3) {
-        alert("⚠️ You've reached your free tier limit of 3 uploads.\nPlease subscribe for unlimited access.");
+    if (currentUploads >= maxUploads) {
+        const tier = isSubscribed ? 'premium' : 'free';
+        const message = '⚠️ You\'ve reached your ' + tier + ' tier limit of ' + maxUploads + ' uploads.';
+        alert(message);
         return;
     }
 
@@ -68,10 +82,15 @@ function uploadFile() {
         if (err) {
             alert("Upload failed: " + err.message);
         } else {
-            // Increment upload count only on success
+            // Increment upload count
             currentUploads = parseInt(localStorage.getItem("uploadCount")) || 0;
             localStorage.setItem("uploadCount", (currentUploads + 1).toString());
             updateUsageCounters();
+                
+            // Different messages based on subscription status
+            if (currentUploads === maxUploads) {
+                alert("⚠️ This is your last upload. Please subscribe for more access.");
+            }
             
             document.getElementById("uploadStatus").innerText = "Upload Successful!";
             

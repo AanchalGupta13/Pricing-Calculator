@@ -54,10 +54,12 @@
 
     <div id="subscribeButtonContainer">
         <!-- Subscribe button will be shown/hidden by JavaScript -->
-        <button onclick="subscribe()" class="subscribe">
+        <button onclick="window.location.href='subscribe.html'" class="subscribe">
             Subscribe
         </button>
     </div>
+
+    <div id="userInfoContainer" class="user-info-container"></div>
 
     <button onclick="logout()" class="logout">
         Sign Out
@@ -67,13 +69,134 @@
     <script src="chat.js"></script>
     
     <script>
+        const UNIFIED_API_ENDPOINT = 'https://jvopmaa40h.execute-api.us-east-1.amazonaws.com/prod/payment/verify';
         // Check subscription status on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            checkSubscriptionStatus();
+        document.addEventListener('DOMContentLoaded', async function () {
+            // Redirect to index.html if no token is found
+            const token = localStorage.getItem("token");
+            if (!token || token.trim() === "") {
+                alert("Unauthorized access. Redirecting...");
+                window.location.href = "http://bellblaze-dev.s3-website.ap-south-1.amazonaws.com/login?DomainPath=/pricing-calculator";
+                return;
+            }
+            // Decode the token to get user info
+            try {
+                const tokenParts = token.split('.');
+                const decodedPayload = JSON.parse(atob(tokenParts[1]));
+                console.log('Decoded Payload:', decodedPayload);
+        
+                const username = decodedPayload.username || decodedPayload.name || 'user';
+                const useremail = decodedPayload.useremail || decodedPayload.email || 'email';
+
+                localStorage.setItem("username", username);
+                localStorage.setItem("useremail", useremail);
+
+                // Verify user against database
+                const isValidUser = await verifyUserWithDatabase(useremail);
+        
+                if (!isValidUser) {
+                    alert("User not authorized. Redirecting...");
+                    window.location.href = "http://bellblaze-dev.s3-website.ap-south-1.amazonaws.com/login?DomainPath=/pricing-calculator";
+                    return;
+                }
+        
+                displayUserName();
+                checkSubscriptionStatus();
+            } catch (error) {
+                console.error('Error during authentication:', error);
+                window.location.href = "http://bellblaze-dev.s3-website.ap-south-1.amazonaws.com/login?DomainPath=/pricing-calculator";
+            }
         });
 
-        function checkSubscriptionStatus() {
-            const isSubscribed = localStorage.getItem("subscribed") === "true";
+        async function verifyUserWithDatabase(email) {
+            try {
+                const response = await fetch(UNIFIED_API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem("token")}`
+                    },
+                    body: JSON.stringify({
+                        action: "verifyUser",
+                        email: email.toLowerCase().trim()
+                    })
+                });
+                console.log('received response:', response);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
+                }
+                const data = await response.json();
+                console.log('Verification response', data);
+                return data.isValidUser === true;
+            } catch (error) {
+                console.error('Error verifying user:', error);
+                return false;
+            }
+        }
+
+        function displayUserName() {
+            const username = localStorage.getItem("username");
+            if (username) {
+                // Create a container for user info in the top-right corner
+                let userContainer = document.getElementById('userInfoContainer');
+                if (!userContainer) {
+                    userContainer = document.createElement('div');
+                    userContainer.id = 'userInfoContainer';
+                    userContainer.className = 'user-info-container';
+                    document.body.appendChild(userContainer);
+                }
+        
+                // Create or update welcome message
+                let welcomeElement = document.getElementById('welcomeMessage');
+                if (!welcomeElement) {
+                    welcomeElement = document.createElement('div');
+                    welcomeElement.id = 'welcomeMessage';
+                    welcomeElement.className = 'welcome-message';
+                    userContainer.appendChild(welcomeElement);
+                }
+                welcomeElement.textContent = `Welcome, ${username}!`;
+        
+                // Move the sign-out button into this container if it's not already there
+                const logoutButton = document.querySelector('.logout');
+                if (logoutButton && !userContainer.contains(logoutButton)) {
+                    userContainer.appendChild(logoutButton);
+                }
+            }
+        }
+
+        async function verifysubscriptionWithDatabase(email) {
+            try {
+                const response = await fetch(UNIFIED_API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem("token")}`
+                    },
+                    body: JSON.stringify({
+                        action: "checkStatus",
+                        email: email.toLowerCase().trim()
+                    })
+                });
+                console.log('received response:', response);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
+                }
+                const data = await response.json();
+                console.log('Verification response', data);
+                return data.isSubscribed === true;
+            } catch (error) {
+                console.error('Error verifying subscription:', error);
+                return false;
+            }
+        }
+
+        async function checkSubscriptionStatus() {
+            const useremail = localStorage.getItem("useremail");
+            const isSubscribed = await verifysubscriptionWithDatabase(useremail);
             const subscriptionStatusDiv = document.getElementById('subscriptionStatus');
             const subscribeButtonContainer = document.getElementById('subscribeButtonContainer');
             
@@ -81,8 +204,10 @@
                 // User is subscribed - show premium status
                 subscriptionStatusDiv.innerHTML = `
                     <div class="premium-badge">
-                        <strong>Premium User:</strong> Unlimited Access
-                    </div>
+                        <strong>Premium User:</strong> Unlocked Premium Access
+                    </div></br>
+                    File Uploads: <span id="uploadCountDisplay">0</span>/5,
+                    Queries used: <span id="queryCountDisplay">0</span>/20 
                 `;
                 // Hide subscribe button
                 subscribeButtonContainer.style.display = 'none';
@@ -100,27 +225,39 @@
             }
         }
 
-        function subscribe() {
-            localStorage.setItem("subscribed", "true");
-            alert("✅ Thank you for subscribing! All limits have been reset.");
-            checkSubscriptionStatus();
+        async function updateUsageCounters() {
+            const useremail = localStorage.getItem("useremail");
+            const isSubscribed = await verifysubscriptionWithDatabase(useremail);
+            const uploadCount = localStorage.getItem("uploadCount") || "0";
+            const queryCount = localStorage.getItem("queryCount") || "0";
+    
+            if (isSubscribed) {
+                if (document.getElementById("uploadCountDisplay")) {
+                    document.getElementById("uploadCountDisplay").textContent = uploadCount;
+                }
+                if (document.getElementById("queryCountDisplay")) {
+                    document.getElementById("queryCountDisplay").textContent = queryCount;
+                }
+            } else {
+                if (document.getElementById("uploadCountDisplay")) {
+                    document.getElementById("uploadCountDisplay").textContent = uploadCount;
+                }
+                if (document.getElementById("queryCountDisplay")) {
+                    document.getElementById("queryCountDisplay").textContent = queryCount;
+                }
+            }
         }
 
         function logout() {
             // Clear all stored data
-            localStorage.removeItem("uploadCount");
-            localStorage.removeItem("queryCount");
-            localStorage.removeItem("subscribed");
+            localStorage.removeItem("token");
+            localStorage.removeItem("username");
+            // localStorage.removeItem("useremail");
             localStorage.removeItem("scrollPosition");
             localStorage.removeItem("storedFiles");
             
             // Redirect to the desired page
             window.location.href = "https://www.bellblazetech.com/products/our-solutions";
-        }
-
-        function updateUsageCounters() {
-            document.getElementById("uploadCountDisplay").textContent = localStorage.getItem("uploadCount") || "0";
-            document.getElementById("queryCountDisplay").textContent = localStorage.getItem("queryCount") || "0";
         }
     </script>        
 </body>

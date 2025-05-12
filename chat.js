@@ -1,10 +1,35 @@
+// Initialize upload count if it doesn't exist
+if (!localStorage.getItem("queryCount")) {
+    localStorage.setItem("queryCount", "0");
+}
+
 function updateQueryCounter() {
-    let queryCount = parseInt(localStorage.getItem("queryCount")) || 0;
-    document.getElementById("queryCountDisplay").textContent = queryCount;
+    const isSubscribed = localStorage.getItem("subscribed") === "true";
+    const queryCount = localStorage.getItem("queryCount") || "0";
+    const maxQueries = isSubscribed ? 20 : 6;
+    const queryCountDisplay = document.getElementById("queryCountDisplay");
+
+    if (queryCountDisplay) {
+        queryCountDisplay.textContent = queryCount; 
+    }
+}
+
+// Reset query count if subscription status changes
+function checkSubscriptionChange() {
+    const currentStatus = localStorage.getItem("subscribed") === "true";
+    const lastKnownStatus = localStorage.getItem("lastSubscriptionStatus");
+    
+    if (lastKnownStatus && currentStatus !== (lastKnownStatus === "true")) {
+        // Subscription status changed - reset counter
+        localStorage.setItem("queryCount", "0");
+    }
+    
+    localStorage.setItem("lastSubscriptionStatus", currentStatus.toString());
 }
 
 // Call it when the page loads
 document.addEventListener('DOMContentLoaded', function() {
+    checkSubscriptionChange();
     updateQueryCounter();
 });
 
@@ -27,26 +52,32 @@ function clearInput() {
 }
 
 async function sendMessage() {
-    // Check query count first
-    let queryCount = parseInt(localStorage.getItem("queryCount") || 0);
-    const maxFreeQueries = 6;
-    
-    if (queryCount >= maxFreeQueries) {
-        alert("⚠️ You've used all free queries. Please subscribe for unlimited access.");
-        return;
-    }
-    
+    const isSubscribed = localStorage.getItem("subscribed") === "true";
+    const maxQueries = isSubscribed ? 20 : 6; // Different limits based on subscription
+    let queryCount = parseInt(localStorage.getItem("queryCount")) || 0;
+
     let userInput = document.getElementById("userInput").value.trim();
     if (!userInput) return;
 
+    // Check query count for all users (both free and subscribed)
+    if (queryCount >= maxQueries) {
+        const tier = isSubscribed ? 'premium' : 'free';
+        const message = '⚠️ You\'ve reached your ' + tier + ' tier limit of ' + maxQueries + ' queries.';
+        alert(message);
+        return;
+    }
+        
     // Increment query count
     queryCount++;
     localStorage.setItem("queryCount", queryCount.toString());
-    
-    // Display usage info
-    if (queryCount === maxFreeQueries) {
-        alert("⚠️ This is your last free query. Please subscribe for unlimited access.");
-    } 
+    updateQueryCounter();
+        
+    // Display usage info for all users
+    if (queryCount === maxQueries) {
+        const tier = isSubscribed ? 'premium' : 'free';
+        const message = '⚠️ This is your last query in your ' + tier + ' tier limit of ' + maxQueries + ' queries.';
+        alert(message);
+    }
 
     let messagesDiv = document.getElementById("messages");
 
@@ -115,13 +146,4 @@ async function sendMessage() {
 function scrollToBottom() {
     let chatbox = document.getElementById("chatbox");
     chatbox.scrollTop = chatbox.scrollHeight;
-}
-
-function subscribeNow() {
-    if (confirm("Subscribe now for unlimited queries and file uploads?\n\n- Unlimited AI queries\n- Unlimited file uploads\n- Priority support")) {
-        localStorage.setItem("uploadCount", "0");
-        localStorage.setItem("queryCount", "0");
-        alert("✅ Thank you for subscribing! All limits have been reset.");
-        updateQueryCounter(); // Update the display
-    }
 }

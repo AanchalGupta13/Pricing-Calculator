@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <img src="BellBlazeTech-Logo.png" alt="Logo" class="logo">
+    <div class="payment-status-container">
+        <div class="success-message">
+            <h1>🎉 Payment Successful!</h1>
+            <p>Thank you for subscribing to our premium service.</p>
+            <p>You now have unlimited access to all features.</p>
+            <button onclick="window.location.href='main.html'" class="redirect-button">
+                Continue to AWS Pricing Calculator
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        // Set subscription status
+        localStorage.setItem("subscribed", "true");
+
+        // Call backend to confirm subscription
+        const email = localStorage.getItem('useremail');
+        if (email) {
+            fetch('https://jvopmaa40h.execute-api.us-east-1.amazonaws.com/prod/payment/verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email })
+            });
+        }
+        
+        // Auto-redirect after 10 seconds
+        setTimeout(() => {
+            window.location.href = "main.html";
+        }, 10000);
+    </script>
+</body>
+</html>
