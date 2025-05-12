@@ -373,7 +373,7 @@ def handle_counter_increment(body):
         # },
         'body': json.dumps({
             'success': True,
-            'queryCount': updated_counts['query_count'],
-            'uploadCount': updated_counts['upload_count']
+            'queryCount': updated_counts['query_count'], # type: ignore
+            'uploadCount': updated_counts['upload_count'] # type: ignore
         })
     }
