@@ -3,19 +3,81 @@ AWS.config.credentials = new AWS.CognitoIdentityCredentials({
     IdentityPoolId: "us-east-1:64e5884b-28df-4bbe-ae4e-097bb5132272"
 });
 
-// Initialize upload count if it doesn't exist
-if (!localStorage.getItem("uploadCount")) {
-    localStorage.setItem("uploadCount", "0");
+async function incrementCounter(counterType) {
+    const useremail = localStorage.getItem("useremail");
+    try {
+        const response = await fetch(UNIFIED_API_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: "incrementCounter",
+                email: useremail,
+                counterType: counterType
+            })
+        });
+        if (!response.ok) {
+            throw new Error('Failed to increment counter');
+        }
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error incrementing counter:', error);
+        throw error;
+    }
 }
 
 // Function to update the display counters
-function updateUsageCounters() {
-    const isSubscribed = localStorage.getItem("subscribed") === "true";
-    const uploadCount = localStorage.getItem("uploadCount") || "0";
-    const maxUploads = isSubscribed ? 5 : 3;
+async function updateUsageCounters() {
+    const useremail = localStorage.getItem("useremail");
+    try {
+        const response = await fetch(UNIFIED_API_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem("token")}`
+            },
+            body: JSON.stringify({
+                action: "checkStatus",
+                email: useremail
+            })
+        });
 
-    // show the higher limits
-    document.getElementById("uploadCountDisplay").textContent = uploadCount;
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Update counters
+            document.getElementById("uploadCountDisplay").textContent = data.uploadCount;
+            document.getElementById("queryCountDisplay").textContent = data.queryCount;
+            document.getElementById("maxUploads").textContent = data.maxUploads;
+            document.getElementById("maxQueries").textContent = data.maxQueries;
+            
+            // Update subscription status display
+            const statusMessage = document.getElementById("statusMessage");
+            if (data.isSubscribed) {
+                statusMessage.innerHTML = '<div class="premium-badge"><strong>Premium User:</strong> Unlocked Premium Access</div>';
+                if (document.getElementById("remainingCounts")) {
+                    document.getElementById("remainingCounts").style.display = 'block';
+                    document.getElementById("remainingUploads").textContent = data.remainingUploads;
+                    document.getElementById("remainingQueries").textContent = data.remainingQueries;
+                }
+            } else {
+                statusMessage.innerHTML = '<strong>Free Tier Limits:</strong>';
+                if (document.getElementById("remainingCounts")) {
+                    document.getElementById("remainingCounts").style.display = 'none';
+                }
+            }
+            
+            // Show/hide subscribe button
+            if (document.getElementById("subscribeButtonContainer")) {
+                document.getElementById("subscribeButtonContainer").style.display = 
+                    data.isSubscribed ? 'none' : 'block';
+            }
+        }
+    } catch (error) {
+        console.error('Error updating usage status:', error);
+    }
 }
 
 // Call it when the page loads
@@ -31,15 +93,27 @@ let uploadedFilename = ""; // Used to track original upload
 let uploadTime = null; // Track exact upload timestamp
 
 // Upload File to S3
-function uploadFile() {
-    const isSubscribed = localStorage.getItem("subscribed") === "true";
-    const maxUploads = isSubscribed ? 5 : 3; // Different limits based on subscription
-
-    // Get current upload count
-    let currentUploads = parseInt(localStorage.getItem("uploadCount")) || 0;
-    if (currentUploads >= maxUploads) {
-        const tier = isSubscribed ? 'premium' : 'free';
-        const message = '⚠️ You\'ve reached your ' + tier + ' tier limit of ' + maxUploads + ' uploads.';
+async function uploadFile() {
+    const useremail = localStorage.getItem("useremail");
+    
+    // First check limits
+    const statusResponse = await fetch(UNIFIED_API_ENDPOINT, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem("token")}`
+        },
+        body: JSON.stringify({
+            action: "checkStatus",
+            email: useremail
+        })
+    });
+    
+    const statusData = await statusResponse.json();
+    
+    if (statusData.uploadCount >= statusData.maxUploads) {
+        const tier = statusData.isSubscribed ? 'premium' : 'free';
+        const message = `⚠️ You've reached your ${tier} tier limit of ${statusData.maxUploads} uploads.`;
         alert(message);
         return;
     }
@@ -101,6 +175,22 @@ function uploadFile() {
             }, 1000);
         }
     });
+    // After successful upload:
+    const incrementResponse = await incrementCounter('uploadCount');
+    updateUsageDisplay(incrementResponse);
+}
+
+function updateUsageDisplay(counterData) {
+    document.getElementById("uploadCountDisplay").textContent = counterData.uploadCount;
+    document.getElementById("queryCountDisplay").textContent = counterData.queryCount;
+    
+    // Update remaining counts display if you have those elements
+    if (document.getElementById("remainingUploads")) {
+        document.getElementById("remainingUploads").textContent = counterData.remainingUploads;
+    }
+    if (document.getElementById("remainingQueries")) {
+        document.getElementById("remainingQueries").textContent = counterData.remainingQueries;
+    }
 }
 
 // List Files in S3 and detect new files

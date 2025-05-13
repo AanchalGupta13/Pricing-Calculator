@@ -34,7 +34,6 @@ def lambda_handler(event, context):
     logger.info(f"Received event: {event}")
     logger.info(f"Body type: {type(event.get('body'))}")
     logger.info(f"Body: {event.get('body')}")
-    
     try:
         # Parse the incoming event
         body = json.loads(event['body']) if event.get('body') else {}
@@ -55,8 +54,7 @@ def lambda_handler(event, context):
             return {
                 'statusCode': 400,
                 'body': json.dumps({'success': False, 'message': 'Invalid action specified'})
-            }
-            
+            }        
     except json.JSONDecodeError:
         return {
             'statusCode': 400,
@@ -92,7 +90,6 @@ def handle_user_verification(body):
                 },
                 'body': json.dumps({'isValidUser': False, 'message': 'Email is required'})
             }
-            
         logger.info(f"Verifying user: {email}")
     
         with get_db_connection() as conn:
@@ -106,8 +103,24 @@ def handle_user_verification(body):
                 """, (email,))
                 result = cursor.fetchone()
                 user_exists = result['user_exists'] if result else False
-                logger.info(f"User exists in oauth table: {bool(user_exists)}")
-                logger.info(f"User data: {user_exists}")    
+                logger.info(f"User data: {user_exists}")
+
+                # Check if user already exists in pricingcalculator
+                cursor.execute("""
+                    SELECT * FROM pricingcalculator WHERE email = %s
+                """, (email,))
+                user = cursor.fetchone()
+                if not user:
+                    # Insert new free-tier user
+                    cursor.execute("""
+                        INSERT INTO pricingcalculator (
+                            email, query_count, upload_count, subscribed
+                        ) VALUES (%s, 0, 0, false)
+                        """, (email,))
+                    conn.commit()
+                    user = {'subscribed': False, 'query_count': 0, 'upload_count': 0}
+            
+                subscribed = user['subscribed']    
         return {
             'statusCode': 200,
             'headers': {
@@ -118,6 +131,11 @@ def handle_user_verification(body):
             'body': json.dumps({
                 'isValidUser':  result['user_exists'],
                 'email': email,
+                'isSubscribed': subscribed,
+                'queryCount': user['query_count'],
+                'uploadCount': user['upload_count'],
+                'maxQueries': 20 if subscribed else 6,
+                'maxUploads': 5 if subscribed else 3
             })
         }
     except Exception as e:
@@ -173,26 +191,23 @@ def handle_payment(body):
                     phone,
                     txn_id
                 ))
-                # conn.commit()
-
                 cursor.execute("""
-                    INSERT INTO public.pricingcalculator (
-                        name, email, phone, txn_id, txn_time, subscribed
-                    ) VALUES (%s, %s, %s, %s, %s, true)
-                    ON CONFLICT (email)
-                    DO UPDATE SET 
-                    name = EXCLUDED.name,
-                    phone = EXCLUDED.phone,
-                    txn_id = EXCLUDED.txn_id,
-                    txn_time = EXCLUDED.txn_time,
-                    subscribed = EXCLUDED.subscribed
+                    UPDATE public.pricingcalculator
+                        SET name = %s,
+                        phone = %s,
+                        txn_id = %s,
+                        txn_time = %s,
+                        subscribed = true,
+                        query_count = 0,
+                        upload_count = 0
+                    WHERE email = %s
                     RETURNING *
                 """, (
                     name,
-                    email,
                     phone,
                     txn_id,
-                    txn_time
+                    txn_time,
+                    email
                 ))
                 conn.commit()
         return {
@@ -223,12 +238,12 @@ def handle_payment(body):
                 'message': 'Internal server error during payment processing'
             })
         }
+
 def verify_razorpay_payment(txn_id):
     """Verify payment with Razorpay API"""
     try:
         payment = razorpay_client.payment.fetch(txn_id)
         logger.info(f"Razorpay payment verification response: {payment}")
-        # payment.get('status') == 'status'
         if(payment.get('status') == 'refunded'):
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
@@ -253,12 +268,11 @@ def handle_status_check(body):
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute("""
-                SELECT subscribed
+                SELECT subscribed, query_count, upload_count 
                 FROM pricingcalculator 
                 WHERE email = %s
             """, (email,))
             user = cursor.fetchone()
-    
     if not user:
         return {
             'statusCode': 404,
@@ -269,29 +283,18 @@ def handle_status_check(body):
             },
             'body': json.dumps({
                 'isSubscribed': False,
-                # 'queryCount': 0,
-                # 'uploadCount': 0,
-                # 'remainingQueries': 6,  
-                # 'remainingUploads': 3
+                'queryCount': 0,
+                'uploadCount': 0,
+                'maxQueries': 6,
+                'maxUploads': 3
             })
         }
-    
     subscribed = user['subscribed']
-    if subscribed:
-        query_count = 20
-        upload_count = 5
-    else:
-        query_count = 6
-        upload_count = 3
-    
-    # Calculate remaining counts
-    if subscribed:
-        remaining_queries = max(0, 20 - query_count)  # limits for subscribed users
-        remaining_uploads = max(0, 5 - upload_count)
-    else:
-        remaining_queries = max(0, 6 - query_count)  # Free tier
-        remaining_uploads = max(0, 3 - upload_count)  
-    
+    query_count = user['query_count'] or 0
+    upload_count = user['upload_count'] or 0
+    max_queries = 20 if subscribed else 6
+    max_uploads = 5 if subscribed else 3
+
     return {
         'statusCode': 200,
         'headers': {
@@ -301,10 +304,12 @@ def handle_status_check(body):
         },
         'body': json.dumps({
             'isSubscribed': subscribed,
-            # 'queryCount': query_count,
-            # 'uploadCount': upload_count,
-            # 'remainingQueries': remaining_queries,
-            # 'remainingUploads': remaining_uploads
+            'queryCount': query_count,
+            'uploadCount': upload_count,
+            'maxQueries': max_queries,
+            'maxUploads': max_uploads,
+            'remainingQueries': max_queries - query_count,
+            'remainingUploads': max_uploads - upload_count
         })
     }
 
@@ -317,12 +322,11 @@ def handle_counter_increment(body):
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             # First check user status
             cursor.execute("""
-                SELECT subscribed
+                SELECT subscribed, query_count, upload_count 
                 FROM pricingcalculator 
                 WHERE email = %s
             """, (email,))
             user = cursor.fetchone()
-            
             if not user:
                 return {
                     'statusCode': 404,
@@ -333,47 +337,61 @@ def handle_counter_increment(body):
                     },
                     'body': json.dumps({'success': False, 'message': 'User not found'})
                 }
-            
-            # If user is subscribed more access unlocked
-            if user['subscribed']:
-                if counter_type == 'queryCount':
-                    query_count = query_count + 1
-                else:
-                    upload_count = upload_count + 1
+            subscribed = user['subscribed']
+            query_count = user['query_count'] or 0
+            upload_count = user['upload_count'] or 0
+            max_queries = 20 if subscribed else 6
+            max_uploads = 5 if subscribed else 3
+
+            if counter_type == 'queryCount':
+                if query_count >= max_queries:
+                    return {
+                        'statusCode': 400,
+                        'headers': {
+                            "Access-Control-Allow-Origin": "*",
+                            "Access-Control-Allow-Headers": "Content-Type",
+                            "Access-Control-Allow-Methods": "POST,OPTIONS"
+                        },
+                        'body': json.dumps({'success': False, 'message': 'Query limit reached'})
+                    } 
+                query_count += 1
+                cursor.execute("UPDATE pricingcalculator SET query_count = %s WHERE email = %s", (query_count, email))
+            elif counter_type == 'uploadCount':
+                if upload_count >= max_uploads:
+                    return {
+                        'statusCode': 400,
+                        'headers': {
+                            "Access-Control-Allow-Origin": "*",
+                            "Access-Control-Allow-Headers": "Content-Type",
+                            "Access-Control-Allow-Methods": "POST,OPTIONS"
+                        },
+                        'body': json.dumps({'success': False, 'message': 'Upload limit reached'})
+                    }
+                upload_count += 1
+                cursor.execute("UPDATE pricingcalculator SET upload_count = %s WHERE email = %s", (upload_count, email))
+            else:
                 return {
-                    'statusCode': 200,
+                    'statusCode': 400,
                     'headers': {
                         "Access-Control-Allow-Origin": "*",
                         "Access-Control-Allow-Headers": "Content-Type",
                         "Access-Control-Allow-Methods": "POST,OPTIONS"
                     },
-                    'body': json.dumps({
-                        'success': True,
-                        'message': 'User is subscribed',
-                        'queryCount': updated_counts['query_count'], # type: ignore
-                        'uploadCount': updated_counts['upload_count'], # type: ignore
-                    })
+                    'body': json.dumps({'success': False, 'message': 'Invalid counterType'})
                 }
-            
-            # For non-subscribed users, increment the counter
-            if counter_type == 'queryCount':
-                query_count = query_count + 1
-            else:
-                upload_count = upload_count + 1
-    return {
-        'statusCode': 200,
-        'headers': {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type",
-            "Access-Control-Allow-Methods": "POST,OPTIONS"
-        },
-        # 'headers': {
-        #     'Content-Type': 'application/json',
-        #     'Access-Control-Allow-Origin': '*'
-        # },
-        'body': json.dumps({
-            'success': True,
-            'queryCount': updated_counts['query_count'], # type: ignore
-            'uploadCount': updated_counts['upload_count'] # type: ignore
-        })
-    }
+            conn.commit()
+            return {
+                'statusCode': 200,
+                'headers': {
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "Content-Type",
+                    "Access-Control-Allow-Methods": "POST,OPTIONS"
+                },
+                'body': json.dumps({
+                    'success': True,
+                    'queryCount': query_count,
+                    'uploadCount': upload_count,
+                    'remainingQueries': max_queries - query_count,
+                    'remainingUploads': max_uploads - upload_count
+                })
+            }

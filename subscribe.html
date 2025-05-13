@@ -37,21 +37,19 @@
         document.addEventListener('DOMContentLoaded', function() {
             const name = localStorage.getItem("username");
             const email = localStorage.getItem("useremail");
-            
             if (name) {
                 document.getElementById('name').value = name;
             }
-            
             if (email) {
                 document.getElementById('email').value = email;
             }
         });
+
         function validateAndSubscribe() {
             // Get form values
             const name = document.getElementById('name').value.trim();
             const email = document.getElementById('email').value.trim();
             const phone = document.getElementById('phone').value.trim();
-    
             if (!phone) {
                 alert("Please enter your phone number");
                 document.getElementById('phone').focus();
@@ -61,7 +59,6 @@
                 document.getElementById('phone').focus();
                 return;
             }
-    
             // If all validations pass, proceed to payment
             subscribeNow(name, email, phone);
         }
@@ -102,8 +99,7 @@
                             phone: phone
                         });
                         if (verificationSuccess) {
-                            // Update local state
-                            handlePaymentSuccess(response);
+                            alert("🎉 Thank you for subscribing!");
                             // Then redirect to success page
                             window.location.href = "success.html";
                         } else {
@@ -163,79 +159,6 @@
                 console.error("Verification error:", error);
                 throw error;
             }
-        }
-
-        function handlePaymentSuccess(response) {
-            // Store payment details in local storage
-            const paymentDetails = {
-                razorpay_payment_id: response.razorpay_payment_id,
-                payment_date: new Date().toISOString(),
-                amount: 100,
-                currency: 'INR'
-            };
-    
-            localStorage.setItem("paymentDetails", JSON.stringify(paymentDetails));
-            localStorage.setItem("subscribed", "true");
-            localStorage.setItem("uploadCount", "0");
-            localStorage.setItem("queryCount", "0");
-            
-            if (typeof checkSubscriptionStatus === 'function') {
-                checkSubscriptionStatus();
-            }
-
-            // Update UI if needed
-            if (typeof updateUsageCounters === 'function') {
-                updateUsageCounters();
-            }
-    
-            // Show success message and redirect
-            alert("🎉 Thank you for subscribing!");
-            window.location.href = "main.html";
-        }
-
-        // function updateUsageCounters() {
-        //     const isSubscribed = localStorage.getItem("subscribed") === "true";
-        //     const uploadCount = localStorage.getItem("uploadCount") || "0";
-        //     const queryCount = localStorage.getItem("queryCount") || "0";
-    
-        //     if (isSubscribed) {
-        //         document.getElementById("uploadCountDisplay").textContent = "5";
-        //         document.getElementById("queryCountDisplay").textContent = "20";
-        //     } else {
-        //         document.getElementById("uploadCountDisplay").textContent = uploadCount;
-        //         document.getElementById("queryCountDisplay").textContent = queryCount;
-        //     }
-        //     // saveUserData();
-        // }
-
-        function checkSubscriptionStatus() {
-            const isSubscribed = localStorage.getItem("subscribed") === "true";
-            const subscriptionStatusDiv = document.getElementById('subscriptionStatus');
-            const subscribeButtonContainer = document.getElementById('subscribeButtonContainer');
-            
-            // if (isSubscribed) {
-            //     // User is subscribed - show premium status
-            //     subscriptionStatusDiv.innerHTML = `
-            //         <div class="premium-badge">
-            //             <strong>Premium User:</strong> Unlocked More Access
-            //         </div>
-            //         File Uploads: <span id="uploadCountDisplay">0</span>/5,
-            //         Queries used: <span id="queryCountDisplay">0</span>/20
-            //     `;
-            //     // Hide subscribe button
-            //     subscribeButtonContainer.style.display = 'none';
-            // } else {
-            //     // User is not subscribed - show free tier limits
-            //     subscriptionStatusDiv.innerHTML = `
-            //         <strong>Free Tier Limits:</strong>
-            //         File Uploads: <span id="uploadCountDisplay">0</span>/3,
-            //         Queries used: <span id="queryCountDisplay">0</span>/6 
-            //     `;
-            //     // Show subscribe button
-            //     subscribeButtonContainer.style.display = 'block';
-            //     // Update counters
-            //     updateUsageCounters();
-            // }
         }
     </script>
 

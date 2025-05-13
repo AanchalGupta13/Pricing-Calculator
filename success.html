@@ -20,21 +20,6 @@
     </div>
     
     <script>
-        // Set subscription status
-        localStorage.setItem("subscribed", "true");
-
-        // Call backend to confirm subscription
-        const email = localStorage.getItem('useremail');
-        if (email) {
-            fetch('https://jvopmaa40h.execute-api.us-east-1.amazonaws.com/prod/payment/verify', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ email })
-            });
-        }
-        
         // Auto-redirect after 10 seconds
         setTimeout(() => {
             window.location.href = "main.html";

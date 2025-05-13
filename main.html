@@ -49,7 +49,9 @@
 
     <!-- Dynamic Subscription Status Display -->
     <div id="subscriptionStatus" class="usage-counter">
-        <!-- Content will be filled by JavaScript -->
+        <div id="statusMessage"></div>
+        <div>File Uploads: <span id="uploadCountDisplay">0</span>/<span id="maxUploads">3</span></div>
+        <div>Queries used: <span id="queryCountDisplay">0</span>/<span id="maxQueries">6</span></div>
     </div>
 
     <div id="subscribeButtonContainer">
@@ -176,38 +178,44 @@
                     },
                     body: JSON.stringify({
                         action: "checkStatus",
-                        email: email.toLowerCase().trim()
+                        email: email
                     })
                 });
                 console.log('received response:', response);
 
                 if (!response.ok) {
-                    const errorText = await response.text();
                     throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
                 }
-                const data = await response.json();
-                console.log('Verification response', data);
-                return data.isSubscribed === true;
+                return await response.json();
             } catch (error) {
                 console.error('Error verifying subscription:', error);
-                return false;
+                return {
+                    isSubscribed: false,
+                    uploadCount: 0,
+                    queryCount: 0,
+                    maxUploads: 3,
+                    maxQueries: 6,
+                    remainingUploads: 3,
+                    remainingQueries: 6
+                };
             }
         }
 
         async function checkSubscriptionStatus() {
             const useremail = localStorage.getItem("useremail");
-            const isSubscribed = await verifysubscriptionWithDatabase(useremail);
+            const data = await verifysubscriptionWithDatabase(useremail);
+            const isSubscribed = data.isSubscribed
             const subscriptionStatusDiv = document.getElementById('subscriptionStatus');
             const subscribeButtonContainer = document.getElementById('subscribeButtonContainer');
             
-            if (isSubscribed) {
+            if (data.isSubscribed) {
                 // User is subscribed - show premium status
                 subscriptionStatusDiv.innerHTML = `
                     <div class="premium-badge">
                         <strong>Premium User:</strong> Unlocked Premium Access
-                    </div></br>
-                    File Uploads: <span id="uploadCountDisplay">0</span>/5,
-                    Queries used: <span id="queryCountDisplay">0</span>/20 
+                    </div>
+                    <div>File Uploads: <span id="uploadCountDisplay">${data.uploadCount}</span>/<span id="maxUploads">${data.maxUploads}</span></div>
+                <div>Queries used: <span id="queryCountDisplay">${data.queryCount}</span>/<span id="maxQueries">${data.maxQueries}</span></div>
                 `;
                 // Hide subscribe button
                 subscribeButtonContainer.style.display = 'none';
@@ -215,44 +223,45 @@
                 // User is not subscribed - show free tier limits
                 subscriptionStatusDiv.innerHTML = `
                     <strong>Free Tier Limits:</strong>
-                    File Uploads: <span id="uploadCountDisplay">0</span>/3,
-                    Queries used: <span id="queryCountDisplay">0</span>/6 
+                    <div>File Uploads: <span id="uploadCountDisplay">${data.uploadCount}</span>/<span id="maxUploads">${data.maxUploads}</span></div>
+                <div>Queries used: <span id="queryCountDisplay">${data.queryCount}</span>/<span id="maxQueries">${data.maxQueries}</span></div>
                 `;
                 // Show subscribe button
                 subscribeButtonContainer.style.display = 'block';
-                // Update counters
-                updateUsageCounters();
             }
         }
 
         async function updateUsageCounters() {
             const useremail = localStorage.getItem("useremail");
-            const isSubscribed = await verifysubscriptionWithDatabase(useremail);
-            const uploadCount = localStorage.getItem("uploadCount") || "0";
-            const queryCount = localStorage.getItem("queryCount") || "0";
-    
-            if (isSubscribed) {
-                if (document.getElementById("uploadCountDisplay")) {
-                    document.getElementById("uploadCountDisplay").textContent = uploadCount;
-                }
-                if (document.getElementById("queryCountDisplay")) {
-                    document.getElementById("queryCountDisplay").textContent = queryCount;
-                }
-            } else {
-                if (document.getElementById("uploadCountDisplay")) {
-                    document.getElementById("uploadCountDisplay").textContent = uploadCount;
-                }
-                if (document.getElementById("queryCountDisplay")) {
-                    document.getElementById("queryCountDisplay").textContent = queryCount;
-                }
+            const data = await verifysubscriptionWithDatabase(useremail);
+            
+            // Update counters
+            document.getElementById("uploadCountDisplay").textContent = data.uploadCount;
+            document.getElementById("queryCountDisplay").textContent = data.queryCount;
+            document.getElementById("maxUploads").textContent = data.maxUploads;
+            document.getElementById("maxQueries").textContent = data.maxQueries;
+            
+            // Update subscription status display
+            const statusMessage = document.getElementById("statusMessage");
+            if (data.isSubscribed) {
+                statusMessage.innerHTML = '<div class="premium-badge"><strong>Premium User:</strong> Unlocked Premium Access</div>';
+                } else {
+                statusMessage.innerHTML = '<strong>Free Tier Limits:</strong>';
             }
+            
+            // Show/hide subscribe button
+            document.getElementById("subscribeButtonContainer").style.display = 
+                data.isSubscribed ? 'none' : 'block';
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateUsageCounters();
+        });
 
         function logout() {
             // Clear all stored data
             localStorage.removeItem("token");
             localStorage.removeItem("username");
-            // localStorage.removeItem("useremail");
             localStorage.removeItem("scrollPosition");
             localStorage.removeItem("storedFiles");
             
