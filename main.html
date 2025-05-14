@@ -56,7 +56,7 @@
 
     <div id="subscribeButtonContainer">
         <!-- Subscribe button will be shown/hidden by JavaScript -->
-        <button onclick="window.location.href='subscribe.html'" class="subscribe">
+        <button onclick="handleSubscription()" class="subscribe">
             Subscribe
         </button>
     </div>
@@ -75,23 +75,46 @@
         // Check subscription status on page load
         document.addEventListener('DOMContentLoaded', async function () {
             // Redirect to index.html if no token is found
-            const token = localStorage.getItem("token");
+            let token = localStorage.getItem("token");
             if (!token || token.trim() === "") {
                 alert("Unauthorized access. Redirecting...");
                 window.location.href = "http://bellblaze-dev.s3-website.ap-south-1.amazonaws.com/login?DomainPath=/pricing-calculator";
                 return;
             }
+
+            // Clean token
+            token = cleanToken(token);
+
             // Decode the token to get user info
+            // Remove URL parameters if present (like ?token=)
+            if (token.includes('?token=')) {
+                token = token.split('?token=')[1];
+            }
+
+            // Split the token into parts
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                throw new Error('Invalid JWT format');
+            }
+
+            // Base64Url decode with padding support
+            const base64Url = parts[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+            
+            // Decode and parse
+            const decodedPayload = JSON.parse(atob(paddedBase64));
+            
+            console.log('Decoded Payload:', decodedPayload);
             try {
-                const tokenParts = token.split('.');
-                const decodedPayload = JSON.parse(atob(tokenParts[1]));
-                console.log('Decoded Payload:', decodedPayload);
-        
-                const username = decodedPayload.username || decodedPayload.name || 'user';
-                const useremail = decodedPayload.useremail || decodedPayload.email || 'email';
+                const username = decodedPayload.username || decodedPayload.name || decodedPayload.sub || "User";
+                const useremail = decodedPayload.useremail || decodedPayload.email || decodedPayload.preferred_username || "";
 
                 localStorage.setItem("username", username);
                 localStorage.setItem("useremail", useremail);
+
+                console.log(username);
+                console.log(useremail);
 
                 // Verify user against database
                 const isValidUser = await verifyUserWithDatabase(useremail);
@@ -110,7 +133,26 @@
             }
         });
 
-        async function verifyUserWithDatabase(email) {
+        function cleanToken(token) {
+            // Remove any URL parameters that might be attached to the token
+            return token.split('?')[0].split('&')[0].trim();
+        }
+
+        function handleSubscription() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert("No token found—please log in again.");
+            } else {
+                const params = new URLSearchParams({
+                    app_id: "pricing-calculator",
+                    token: token
+                });
+                window.location.href = "subscribe.html?" + params.toString();
+            }
+        }
+
+        async function verifyUserWithDatabase() {
+            const useremail = localStorage.getItem("useremail");
             try {
                 const response = await fetch(UNIFIED_API_ENDPOINT, {
                     method: 'POST',
@@ -120,7 +162,7 @@
                     },
                     body: JSON.stringify({
                         action: "verifyUser",
-                        email: email.toLowerCase().trim()
+                        email: useremail
                     })
                 });
                 console.log('received response:', response);
@@ -131,7 +173,7 @@
                 }
                 const data = await response.json();
                 console.log('Verification response', data);
-                return data.isValidUser === true;
+                return data.isValidUser;
             } catch (error) {
                 console.error('Error verifying user:', error);
                 return false;
@@ -168,22 +210,23 @@
             }
         }
 
-        async function verifysubscriptionWithDatabase(email) {
+        async function verifysubscriptionWithDatabase() {
+            const useremail = localStorage.getItem("useremail");
             try {
                 const response = await fetch(UNIFIED_API_ENDPOINT, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem("token")}`
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         action: "checkStatus",
-                        email: email
+                        email: useremail
                     })
                 });
                 console.log('received response:', response);
 
                 if (!response.ok) {
+                    console.error('API Error Response:',await response.text());
                     throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
                 }
                 return await response.json();

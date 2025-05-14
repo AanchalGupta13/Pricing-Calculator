@@ -7,21 +7,63 @@
 </head>
 <body>
     <script>
-          document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function() {
             createSession();
         });
-        function createSession(){
+
+        function createSession() {
+            console.log("Current URL:", window.location.href);
             const urlParams = new URLSearchParams(window.location.search);
-            const token = urlParams.get('token');
-            if (token && token.trim() !== "") {
-                // Token exists – store and redirect
-                localStorage.setItem("token", token);
-                window.location.href = "main.html";
-            } else {
-                // No token – stay on page or show message
-                document.body.innerHTML = "<h3>Access denied.</h3>";
+            let token = urlParams.get('token');
+            
+            if (!token) {
+                showError("No token found in URL");
+                return;
             }
-        }  
+
+            // Clean token if it contains URL parameters
+            token = cleanToken(token);
+            console.log("Cleaned Token:", token);
+
+            if (!isValidToken(token)) {
+                showError("Invalid token format");
+                return;
+            }
+
+            try {
+                // Store token and verify
+                localStorage.setItem("token", token);
+                const storedToken = localStorage.getItem("token");
+                
+                if (storedToken !== token) {
+                    throw new Error("Token storage verification failed");
+                }
+
+                // Redirect to main page
+                window.location.href = "main.html";
+            } catch (error) {
+                showError(`Session creation failed: ${error.message}`);
+            }
+        }
+
+        function cleanToken(token) {
+            // Handle cases where token might include unwanted parameters
+            return token.split('?')[0].split('&')[0].trim();
+        }
+
+        function isValidToken(token) {
+            // Basic JWT validation (3 parts separated by dots)
+            return token && typeof token === 'string' && token.split('.').length === 3;
+        }
+
+        function showError(message) {
+            console.error(message);
+            document.body.innerHTML = `
+                <h3>Access Denied</h3>
+                <p>${message}</p>
+                <button onclick="window.location.href='login.html'">Go to Login</button>
+            `;
+        }
     </script>
 </body>
 </html>

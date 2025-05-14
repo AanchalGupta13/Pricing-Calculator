@@ -161,6 +161,8 @@ def handle_payment(body):
         name = body['name']
         phone = body['phone']
         txn_time = datetime.now()
+        app_id = body['appId']
+        order_id = body['paymentId']
     
         # Verify payment with Razorpay API (simplified)
         is_payment_valid = verify_razorpay_payment(txn_id)
@@ -181,15 +183,16 @@ def handle_payment(body):
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
-                    INSERT INTO public.bbt_premiumusers (
-                        name, email, phone, txn_id
-                    ) VALUES (%s, %s, %s, %s)
+                    INSERT INTO public.bbt_tempusers (
+                        name, email, phone, app_id, order_id
+                    ) VALUES (%s, %s, %s, %s, %s)
                     RETURNING *
                 """, (
                     name,
                     email,
                     phone,
-                    txn_id
+                    app_id,
+                    order_id
                 ))
                 cursor.execute("""
                     UPDATE public.pricingcalculator
