@@ -29,12 +29,12 @@ CALCULATE_LAMBDA_NAME = os.environ.get("CALCULATE_LAMBDA_NAME", "CostCalculation
 
 # Fetch and read the Excel file from S3
 def fetch_requirements_from_s3(bucket, file_key):
+    logger.info(f"S3 Trigger Event Bucket: {bucket}, Key: {file_key}")
     try:
         s3_object = s3_client.get_object(Bucket=bucket, Key=file_key)
         file_stream = io.BytesIO(s3_object["Body"].read())
         df = pd.read_excel(file_stream)
-        # Replace NaN values with None
-        df = df.where(pd.notna(df), None)
+        df = df.where(pd.notna(df), None)    # Replace NaN values with None
         requirements = df.to_dict(orient="records")
         logger.info(f"Requirements fetched from S3: {requirements}")
         return requirements
@@ -46,14 +46,13 @@ def fetch_requirements_from_s3(bucket, file_key):
 def extract_cpu_ram(requirements):
     logger.info(f"Extracting CPU and RAM from requirements: {requirements}")
     filtered_requirements = []
-
     for req in requirements:
         try:
             cpu_text = str(req.get('CPU', '')).strip()
             ram_text = str(req.get('RAM', '')).strip()
 
             # Extract only numeric CPU value (e.g., "8" from "8 Cores @ 3.2GHz")
-            cpu_match = re.search(r'(\d+)\s*Cores', cpu_text, re.IGNORECASE)
+            cpu_match = re.search(r'(\d+)\s*(?:Cores|vCPU|CPU|cpu)', cpu_text, re.IGNORECASE)
             # Extract RAM value (e.g., "16" from "16GB")
             ram_match = re.search(r'(\d+)', ram_text)
 
@@ -68,10 +67,9 @@ def extract_cpu_ram(requirements):
                 })
             else:
                 logger.warning(f"Skipping entry with missing CPU/RAM: {req}")
-
         except Exception as e:
-            logger.error(f"Error extracting CPU/RAM from {req}: {e}")
-
+            logger.error(f"Error extracting CPU/RAM from {req}: {e}") 
+    logger.info(f"Filtered requirements: {filtered_requirements}")
     return filtered_requirements  # Returns a list of cleaned CPU and RAM values
 
 # Store results in S3 as CSV
@@ -106,26 +104,50 @@ def clean_nan_values(obj):
 # Lambda handler function
 def lambda_handler(event, context):
     try:
+        from urllib.parse import unquote
         bucket = event["Records"][0]["s3"]["bucket"]["name"]
-        file_key = event["Records"][0]["s3"]["object"]["key"]
+        file_key = unquote(event["Records"][0]["s3"]["object"]["key"])  # Decode URL-encoded characters
+        
+        if os.path.basename(file_key).startswith("Error_"):
+            logger.info(f"Skipping processing for error file: {file_key}")
+            return {
+                "statusCode": 200,
+                "body": json.dumps("Skipped processing error file.")
+            }
+        logger.info(f"S3 Trigger Event Bucket: {bucket}, Key: {file_key}")
 
         # Extract base name of uploaded file (without extension)
         original_filename = os.path.splitext(os.path.basename(file_key))[0]
+        logger.info(f"Original Filename: {original_filename}")
+
+        # Create error file key    
+        ERROR_FILE_KEY = f"Error_{original_filename}_{timestamp_str}.json"
+        logger.info(f"Error File Key: {ERROR_FILE_KEY}")
+
         # Create a filename with IST timestamp
         CSV_FILE_KEY = f"Price_{original_filename}_{timestamp_str}.csv"
+        logger.info(f"CSV File Key: {CSV_FILE_KEY}")
         
         requirements = fetch_requirements_from_s3(bucket, file_key)
+        logger.info(f"Requirements fetched from S3: {requirements}")
         if not requirements:
-            return {"statusCode": 500, "body": json.dumps("Failed to fetch requirements from S3.")}
+            error_response = {"statusCode": 500, "body": "Failed to fetch server requirements from uploaded file."}
+            return error_response
 
         # Clean NaN values
         cleaned_requirements = clean_nan_values(requirements)
         extracted_requirements = extract_cpu_ram(cleaned_requirements)
 
         if not extracted_requirements:
-            return {"statusCode": 500, "body": json.dumps("No valid CPU/RAM data found.")}
-
-        logger.info(f"Extracted Requirements Before Sending to Lambda: {json.dumps(extracted_requirements, indent=2)}")
+            error_response = {"statusCode": 500, "body": "No valid CPU/RAM data found."}
+            s3_client.put_object(
+                Bucket=bucket,
+                Key=ERROR_FILE_KEY,  # Ensure this is a defined .json file key
+                Body=json.dumps(error_response),
+                ContentType="application/json"
+            )
+            logger.info(f"Error response uploaded to S3: s3://{bucket}/{ERROR_FILE_KEY}")
+            return error_response
 
         # Invoke CostCalculationLambda
         response = lambda_client.invoke(
@@ -149,4 +171,5 @@ def lambda_handler(event, context):
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        return {"statusCode": 500, "body": json.dumps(f"Unexpected error: {e}")}
+        error_response = {"statusCode": 500, "body": f"Unexpected error: {str(e)}"}
+        return error_response
