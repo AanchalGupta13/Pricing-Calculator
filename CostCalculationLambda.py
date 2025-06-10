@@ -9,7 +9,7 @@ logger.setLevel(logging.INFO)
 
 # Create AWS Clients
 ec2_client = boto3.client('ec2')
-pricing_client = boto3.client("pricing", region_name="us-east-1")
+pricing_client = boto3.client("pricing", region_name="ap-south-1")
 
 # Fetch Available EC2 instance types
 def fetch_ec2_instance_types():
@@ -28,36 +28,70 @@ def fetch_ec2_instance_types():
         return {}
       
 # Find best matching instances
-def find_best_match(requirements, ec2_instances):
+def find_best_match(requirements, ec2_instances, region="Asia Pacific (Mumbai)"):
     if not requirements or not ec2_instances:
         logger.warning("Empty requirements or EC2 instances")
         return []
     matched_instances = []
     for req in requirements:
-        best_match = None
-        int(req["CPU"])
-        int(req["RAM"])
-        for instance_name, instance in ec2_instances.items():
-            if instance["vCPUs"] >= req["CPU"] and instance["MemoryMiB"] >= req["RAM"]:
-                if best_match is None or (instance["vCPUs"] < best_match["vCPUs"] or instance["MemoryMiB"] < best_match["MemoryMiB"]):
-                    best_match = {
-                        "InstanceType": instance_name,
-                        "vCPUs": instance["vCPUs"],
-                        "MemoryMiB": instance["MemoryMiB"]
-                    }
-        if best_match:
+        req_cpu = int(req["CPU"])
+        req_ram = int(req["RAM"])
+        # Step 1: Filter instances that meet the requirement
+        candidate_instances = [
+            {
+                "InstanceType": instance_name,
+                "vCPUs": instance["vCPUs"],
+                "MemoryMiB": instance["MemoryMiB"]
+            }
+            for instance_name, instance in ec2_instances.items()
+            if instance["vCPUs"] >= req_cpu and instance["MemoryMiB"] >= req_ram
+        ]
+        logger.info(f"Candidate instances: {candidate_instances}")
+
+        if not candidate_instances:
+            logger.warning(f"No instance found for: {req['Server Name']}")
+            continue
+
+        # Step 2: Find minimum vCPU and RAM among candidates
+        min_vcpu = min(i["vCPUs"] for i in candidate_instances)
+        min_ram = min(i["MemoryMiB"] for i in candidate_instances if i["vCPUs"] == min_vcpu)
+
+        # Step 3: Get all instances with minimal vCPU and RAM
+        minimal_footprint = [
+            i for i in candidate_instances if i["vCPUs"] == min_vcpu and i["MemoryMiB"] == min_ram
+        ]
+        logger.info(f"Minimal instances: {minimal_footprint}")
+
+        # Step 4: Get price for each and select the cheapest
+        best_instance = None
+        lowest_price = float("inf")
+        for instance in minimal_footprint:
+            try:
+                price = get_instance_price(instance["InstanceType"], region)
+                logger.info(f"Price for {instance['InstanceType']} in {region}: {price}")
+                if price is not None and price < lowest_price:
+                    lowest_price = price
+                    best_instance = instance
+                    best_instance["PricePerHour"] = price
+                    logger.info(f"New best instance: {best_instance} and price : {price}")
+            except ClientError as e:
+                logger.error(f"Error getting price for {instance['InstanceType']}: {e}")
+        
+        if best_instance:
             matched_instances.append({
-                "Server Name": req["Server Name"],
-                "CPU": best_match["vCPUs"],
-                "RAM": best_match["MemoryMiB"],
-                "InstanceType": best_match["InstanceType"],
-                "Storage": req["Storage"],
-                "Database": req["Database"]
+                "Server Name": req.get("Server Name", "Unknown"),
+                "CPU": best_instance["vCPUs"],
+                "RAM": best_instance["MemoryMiB"],
+                "InstanceType": best_instance["InstanceType"],
+                "PricePerHour": f"${best_instance['PricePerHour']}",
+                "Storage": req.get("Storage", ""),
+                "Database": req.get("Database", "")
             })
+    logger.info(f"Matched instances: {matched_instances}")
     return matched_instances
 
 # Get instance pricing
-def get_instance_price(instance_type, region="US East (N. Virginia)"):
+def get_instance_price(instance_type, region="Asia Pacific (Mumbai)"):
     try:
         response = pricing_client.get_products(
             ServiceCode="AmazonEC2",
