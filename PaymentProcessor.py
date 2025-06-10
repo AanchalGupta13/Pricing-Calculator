@@ -39,7 +39,8 @@ def lambda_handler(event, context):
         body = json.loads(event['body']) if event.get('body') else {}
         logger.info(f"Parsed body: {body}")
         action = body.get('action')
-        email = body.get('email', '').lower().strip()
+        email = body.get("email")
+        email = email.lower().strip() if email else None
         
         # Route based on action
         if action == 'processPayment':
@@ -79,44 +80,60 @@ def lambda_handler(event, context):
 def handle_user_verification(body):
     """Verify user exists in bbt_oauthusers table"""
     try:
-        email = body.get('email', '').lower().strip()
-        if not email:
-            return {
-                'statusCode': 400,
-                'headers': {
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Headers": "Content-Type",
-                    "Access-Control-Allow-Methods": "POST,OPTIONS"
-                },
-                'body': json.dumps({'isValidUser': False, 'message': 'Email is required'})
-            }
-        logger.info(f"Verifying user: {email}")
+        email = body.get("email")
+        email = email.lower().strip() if email else None
+        provider_user_id = body.get('provider_user_id', '') or None
+        logger.info(f"Verifying user: {email}, {provider_user_id}")
     
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 # Check if user exists in oauth table
-                cursor.execute("""
-                    SELECT EXISTS(
-                        SELECT 1 FROM public.bbt_oauthusers 
-                        WHERE LOWER(TRIM(email)) = %s
-                    ) AS user_exists
-                """, (email,))
+                if provider_user_id:
+                    provider = 'linkedin'
+                    # Check with provider user ID
+                    cursor.execute("""
+                        SELECT EXISTS(
+                            SELECT 1 FROM public.bbt_oauthusers 
+                            WHERE provider = %s AND provider_user_id = %s
+                        ) AS user_exists
+                    """, (provider, provider_user_id))
+                else:
+                    # Check with email
+                    cursor.execute("""
+                        SELECT EXISTS(
+                            SELECT 1 FROM public.bbt_oauthusers 
+                            WHERE LOWER(TRIM(email)) = %s
+                        ) AS user_exists
+                    """, (email,))
                 result = cursor.fetchone()
                 user_exists = result['user_exists'] if result else False
                 logger.info(f"User data: {user_exists}")
 
                 # Check if user already exists in pricingcalculator
-                cursor.execute("""
-                    SELECT * FROM pricingcalculator WHERE email = %s
-                """, (email,))
+                if provider_user_id:
+                    # Check with provider user ID
+                    cursor.execute("""
+                        SELECT * FROM pricingcalculator 
+                        WHERE provider_user_id = %s OR (provider_user_id IS NULL AND email = %s)
+                        LIMIT 1
+                    """, (provider_user_id, email))
+                else:
+                    # Check with email
+                    cursor.execute("""
+                        SELECT * FROM pricingcalculator 
+                        WHERE email = %s AND (provider_user_id IS NULL OR provider_user_id = '')
+                        LIMIT 1
+                    """, (email,))
                 user = cursor.fetchone()
+                logger.info(f"User data: {user}")
                 if not user:
-                    # Insert new free-tier user
+                    # Insert new free-tier user with NULL provider_user_id if empty
+                    provider_id = provider_user_id if provider_user_id else None
                     cursor.execute("""
                         INSERT INTO pricingcalculator (
-                            email, query_count, upload_count, subscribed
-                        ) VALUES (%s, 0, 0, false)
-                        """, (email,))
+                            email, provider_user_id, query_count, upload_count, subscribed
+                        ) VALUES (%s, %s, 0, 0, false)
+                        """, (email, provider_user_id))
                     conn.commit()
                     user = {'subscribed': False, 'query_count': 0, 'upload_count': 0}
             
@@ -131,6 +148,7 @@ def handle_user_verification(body):
             'body': json.dumps({
                 'isValidUser':  result['user_exists'],
                 'email': email,
+                'provider_user_id': provider_user_id,
                 'isSubscribed': subscribed,
                 'queryCount': user['query_count'],
                 'uploadCount': user['upload_count'],
@@ -157,6 +175,7 @@ def handle_payment(body):
     """Handle payment processing and store in bbt_premiumusers"""
     try:
         txn_id = body['paymentId']
+        provider_user_id = body.get('provider_user_id', '')
         email = body['email'].lower().strip()
         name = body['name']
         phone = body['phone']
@@ -194,24 +213,74 @@ def handle_payment(body):
                     app_id,
                     order_id
                 ))
-                cursor.execute("""
-                    UPDATE public.pricingcalculator
-                        SET name = %s,
-                        phone = %s,
-                        txn_id = %s,
-                        txn_time = %s,
-                        subscribed = true,
-                        query_count = 0,
-                        upload_count = 0
-                    WHERE email = %s
-                    RETURNING *
-                """, (
-                    name,
-                    phone,
-                    txn_id,
-                    txn_time,
-                    email
-                ))
+                if provider_user_id:
+                    # Check if the new email already exists in another row
+                    cursor.execute("""
+                        SELECT 1 FROM pricingcalculator
+                        WHERE email = %s AND provider_user_id IS DISTINCT FROM %s
+                    """, (email, provider_user_id))
+
+                    email_exists = cursor.fetchone()
+
+                    if email_exists:
+                        # Just update other fields without changing the email
+                        cursor.execute("""
+                            UPDATE pricingcalculator
+                            SET name = %s,
+                                phone = %s,
+                                txn_id = %s,
+                                txn_time = %s,
+                                subscribed = true,
+                                query_count = 0,
+                                upload_count = 0
+                            WHERE provider_user_id = %s
+                        """, (
+                            name,
+                            phone,
+                            txn_id,
+                            txn_time,
+                            provider_user_id
+                        ))
+                    else:
+                        # Safe to update email
+                        cursor.execute("""
+                            UPDATE pricingcalculator
+                            SET email = %s,
+                                name = %s,
+                                phone = %s,
+                                txn_id = %s,
+                                txn_time = %s,
+                                subscribed = true,
+                                query_count = 0,
+                                upload_count = 0
+                            WHERE provider_user_id = %s
+                        """, (
+                            email,
+                            name,
+                            phone,
+                            txn_id,
+                            txn_time,
+                            provider_user_id
+                        ))
+                else :
+                    cursor.execute("""
+                        UPDATE public.pricingcalculator
+                            SET name = %s,
+                            phone = %s,
+                            txn_id = %s,
+                            txn_time = %s,
+                            subscribed = true,
+                            query_count = 0,
+                            upload_count = 0
+                        WHERE email = %s
+                        RETURNING *
+                    """, (
+                        name,
+                        phone,
+                        txn_id,
+                        txn_time,
+                        email
+                    ))
                 conn.commit()
         return {
             'statusCode': 200,
@@ -266,16 +335,54 @@ def verify_razorpay_payment(txn_id):
 
 def handle_status_check(body):
     """Check user subscription status"""
-    email = body['email'].lower().strip()
+    email = body.get("email")
+    email = email.lower().strip() if email else None
+    provider_user_id = body.get('provider_user_id', '')
+    logger.info(f"Checking subscription status for: {email}, {provider_user_id}")
     
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute("""
-                SELECT subscribed, query_count, upload_count 
-                FROM pricingcalculator 
-                WHERE email = %s
-            """, (email,))
+            if provider_user_id:
+                cursor.execute("""
+                    SELECT subscribed, query_count, upload_count, txn_time 
+                    FROM pricingcalculator 
+                    WHERE provider_user_id = %s
+                """, (provider_user_id,))
+            else:
+                cursor.execute("""
+                    SELECT subscribed, query_count, upload_count, txn_time 
+                    FROM pricingcalculator 
+                    WHERE email = %s
+                """, (email,))
             user = cursor.fetchone()
+
+            # Check if subscription has expired (24 hours after txn_time)
+            if user and user['subscribed'] and user['txn_time']:
+                subscription_time = user['txn_time']
+                logger.info(f"subscription_time: {subscription_time}")
+                current_time = datetime.now()
+                logger.info(f"current_time: {current_time}")
+                hours_elapsed = (current_time - subscription_time).total_seconds() / 3600
+                logger.info(f"hours_elapsed: {hours_elapsed}")
+                
+                if hours_elapsed >= 24:
+                    logger.info(f"Subscription Expired")
+                    # Update subscription status to expired
+                    if provider_user_id:
+                        cursor.execute("""
+                            UPDATE pricingcalculator
+                            SET subscribed = false
+                            WHERE provider_user_id = %s
+                        """, (provider_user_id,))
+                    else:
+                        cursor.execute("""
+                            UPDATE pricingcalculator
+                            SET subscribed = false
+                            WHERE email = %s
+                        """, (email,))
+                    conn.commit()
+                    user['subscribed'] = False
+                    logger.info(f"Subscription expired for user: {email}")
     if not user:
         return {
             'statusCode': 404,
@@ -318,17 +425,25 @@ def handle_status_check(body):
 
 def handle_counter_increment(body):
     """Increment usage counters with subscription check"""
-    email = body['email'].lower().strip()
+    email = body.get("email")
+    email = email.lower().strip() if email else None
+    provider_user_id = body.get('provider_user_id', '')
     counter_type = body['counterType']  # 'queryCount' or 'uploadCount'
     
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            # First check user status
-            cursor.execute("""
-                SELECT subscribed, query_count, upload_count 
-                FROM pricingcalculator 
-                WHERE email = %s
-            """, (email,))
+            if provider_user_id:
+                cursor.execute("""
+                    SELECT subscribed, query_count, upload_count 
+                    FROM pricingcalculator 
+                    WHERE provider_user_id = %s
+                """, (provider_user_id,))
+            else:
+                cursor.execute("""
+                    SELECT subscribed, query_count, upload_count 
+                    FROM pricingcalculator 
+                    WHERE email = %s
+                """, (email,))
             user = cursor.fetchone()
             if not user:
                 return {
@@ -358,7 +473,19 @@ def handle_counter_increment(body):
                         'body': json.dumps({'success': False, 'message': 'Query limit reached'})
                     } 
                 query_count += 1
-                cursor.execute("UPDATE pricingcalculator SET query_count = %s WHERE email = %s", (query_count, email))
+                if provider_user_id:
+                    cursor.execute("""
+                        UPDATE pricingcalculator
+                        SET query_count = %s
+                        WHERE provider_user_id = %s
+                    """, (query_count, provider_user_id,))
+                else:
+                    cursor.execute("""
+                        UPDATE pricingcalculator
+                        SET query_count = %s
+                        WHERE email = %s
+                    """, (query_count, email,))
+                conn.commit()
             elif counter_type == 'uploadCount':
                 if upload_count >= max_uploads:
                     return {
@@ -371,7 +498,19 @@ def handle_counter_increment(body):
                         'body': json.dumps({'success': False, 'message': 'Upload limit reached'})
                     }
                 upload_count += 1
-                cursor.execute("UPDATE pricingcalculator SET upload_count = %s WHERE email = %s", (upload_count, email))
+                if provider_user_id:
+                    cursor.execute("""
+                        UPDATE pricingcalculator
+                        SET upload_count = %s
+                        WHERE provider_user_id = %s
+                    """, (upload_count, provider_user_id,))
+                else:
+                    cursor.execute("""
+                        UPDATE pricingcalculator
+                        SET upload_count = %s
+                        WHERE email = %s
+                    """, (upload_count, email,))
+                conn.commit()
             else:
                 return {
                     'statusCode': 400,
